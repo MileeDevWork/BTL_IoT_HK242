@@ -1,7 +1,7 @@
 #include <wifi.hpp>
 
-constexpr char WIFI_SSID[] = "ACLAB";
-constexpr char WIFI_PASSWORD[] = "ACLAB2023";
+constexpr char WIFI_SSID[] = "Min";
+constexpr char WIFI_PASSWORD[] = "123456789";
 
 // HÀM KẾT NỐI WIFI
 void InitWiFi()
@@ -22,10 +22,20 @@ void InitWiFi()
 // KIỂM TRA VÀ KẾT NỐI LẠI WIFI NẾU MẤT KẾT NỐI
 bool reconnect()
 {
-  if (WiFi.status() != WL_CONNECTED)
+  if (WiFi.status() == WL_CONNECTED)
   {
     return true;
   }
   InitWiFi();
   return true;
+}
+
+// Task quản lý WiFi
+void wifiTask(void *pvParameters) {
+    for (;;) {
+        if (WiFi.status() != WL_CONNECTED) {
+            InitWiFi();
+        }
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
 }

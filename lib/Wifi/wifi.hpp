@@ -9,6 +9,7 @@ extern "C" {
 
 void InitWiFi();
 bool reconnect();
+void wifiTask(void *pvParameters);
 
 
 ///

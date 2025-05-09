@@ -4,19 +4,42 @@
 #include <global.hpp>
 #include <mqtt.hpp> 
 #include <sensor.hpp>
+#include "HCSR04.h"
 
 void setup()
 {
   Serial.begin(115200);
-  dht.begin();
-  InitWiFi();
+  Wire.begin(SDA_PIN, SCL_PIN);
+  
+  // Khởi tạo các cảm biến
+  dht20.begin();
+  ultrasonicSensor = new UltraSonicDistanceSensor(SONIC_TRIGGER, SONIC_ECHO);
+  
+  // Khởi tạo các chân GPIO
+  pinMode(MQ135_PIN, INPUT);
+  pinMode(LED_PIN, OUTPUT);
+  pinMode(PIR_PIN, INPUT);
+  digitalWrite(LED_PIN, LOW);
+  digitalWrite(LED_PIN, LOW);
+  
+  // Khởi tạo mutex
   sensorDataMutex = xSemaphoreCreateMutex();
-  pinMode(MQ135_PIN,INPUT);
-  xTaskCreate(readDHT11, "DHT20Task", 4096, NULL, 2, NULL);
+  
+  // Khởi tạo WiFi
+  InitWiFi();
+    // Tạo các task
+  xTaskCreate(wifiTask, "WiFi_Task", 4096, NULL, 1, NULL);
   xTaskCreate(TaskThingsBoard, "ThingsBoard_Task", 4096, NULL, 2, NULL);
-  xTaskCreate(readMQ135, "MQ135Task", 2048, NULL, 1, NULL);
+  xTaskCreate(readDHT20, "DHT20_Task", 4096, NULL, 2, NULL);
+  xTaskCreate(readMQ135, "MQ135_Task", 2048, NULL, 1, NULL);
+  xTaskCreate(ultrasonicTask, "Ultrasonic_Task", 4096, NULL, 3, NULL);
+  xTaskCreate(pirTask, "PIR_Task", 2048, NULL, 2, NULL);
+  
+  Serial.println("Hệ thống đã khởi tạo xong và sẵn sàng!");
 }
 
 void loop()
 {
+  // Không cần làm gì ở đây vì tất cả đã được quản lý bởi FreeRTOS
+  vTaskDelay(portMAX_DELAY);
 }
