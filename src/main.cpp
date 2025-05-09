@@ -11,8 +11,10 @@ void setup()
   dht.begin();
   InitWiFi();
   sensorDataMutex = xSemaphoreCreateMutex();
+  pinMode(MQ135_PIN,INPUT);
   xTaskCreate(readDHT11, "DHT20Task", 4096, NULL, 2, NULL);
   xTaskCreate(TaskThingsBoard, "ThingsBoard_Task", 4096, NULL, 2, NULL);
+  xTaskCreate(readMQ135, "MQ135Task", 2048, NULL, 1, NULL);
 }
 
 void loop()

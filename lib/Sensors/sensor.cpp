@@ -1,6 +1,8 @@
 #include <sensor.hpp>
 
 DHT dht(DHTPIN, DHTTYPE);
+int airQuality = 0 ;
+MQ135 mq135_sensor(MQ135_PIN); 
 
 void readDHT11(void *pvParameters)
 {
@@ -31,5 +33,23 @@ void readDHT11(void *pvParameters)
       }
     }
     vTaskDelay(pdMS_TO_TICKS(500)); // Giảm tải CPU, kiểm tra lại sau 500ms
+  }
+}
+
+void readMQ135(void *pvParameters) {
+  while (1) {
+    // int rawValue = analogRead(MQ135_PIN); // Đọc giá trị analog từ MQ135
+    // airQuality = rawValue;
+
+    float ppm = mq135_sensor.getPPM();
+    float correctedPPM = mq135_sensor.getCorrectedPPM(temperature, humidity);
+
+    Serial.printf("Chất lượng không khí (MQ135): %d\n", correctedPPM);
+
+    if (tb.connected()) {
+      tb.sendTelemetryData("air_quality", correctedPPM); // Gửi lên CoreIoT
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(5000)); // Gửi mỗi 5 giây
   }
 }
