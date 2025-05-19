@@ -7,7 +7,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
-#define MAX_DEVICES 10
+#define MAX_DEVICES 20
 
 struct Device {
     const char* name;

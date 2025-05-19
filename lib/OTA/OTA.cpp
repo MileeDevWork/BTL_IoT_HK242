@@ -1,21 +1,5 @@
-#define SDA_PIN GPIO_NUM_11
-#define SCL_PIN GPIO_NUM_12
-
-#include <ArduinoHttpClient.h>
-#include <WiFi.h>
-#include <PubSubClient.h>
-#include <ArduinoJson.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include "DHT20.h"
-#include <Update.h>
+#include "OTA.h"
 #include <vector>
-
-// Thông tin kết nối
-constexpr char WIFI_SSID[] = "TRUC ANH"; // Thay bằng SSID của bạn
-constexpr char WIFI_PASSWORD[] = "23230903"; // Thay bằng mật khẩu WiFi của bạn
-constexpr char THINGSBOARD_SERVER[] = "app.coreiot.io";
-constexpr uint16_t THINGSBOARD_PORT = 1883U;
 
 // Biến OTA toàn cục
 bool otaInProgress = false;
@@ -27,21 +11,8 @@ String fw_title = "", fw_version = "", fw_checksum = "", fw_algo = "sha256";
 unsigned long lastRequestTime = 0;
 const unsigned long REQUEST_TIMEOUT = 5000; // 5 giây
 
-DHT20 dht20;
-
-#define MAX_DEVICES 10
-
-// Cấu trúc thiết bị
-struct Alldevice {
-    const char* name;
-    const char* token;
-    WiFiClient* wifiClient;
-    PubSubClient* mqttClient;
-    bool connected;
-    void (*callback)(char*, byte*, unsigned int);
-};
-
-Alldevice devices[MAX_DEVICES];
+// Mảng lưu thiết bị
+Alldevice devices[10];
 int deviceCount = 0;
 int dhtDeviceIndex = -1;
 
@@ -141,20 +112,9 @@ void deviceCallback(char* topic, byte* payload, unsigned int length) {
     }
 }
 
-// Kết nối WiFi
-void connectWifi() {
-    Serial.print("Connecting to WiFi...");
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        Serial.print(".");
-    }
-    Serial.println("Connected to WiFi");
-}
-
 // Thêm thiết bị
-int addDevice(const char* name, const char* token, void (*callback)(char*, byte*, unsigned int) = nullptr) {
-    if (deviceCount >= MAX_DEVICES) return -1;
+int addDevice(const char* name, const char* token, void (*callback)(char*, byte*, unsigned int)) {
+    if (deviceCount >= 10) return -1;
     int deviceIndex = deviceCount++;
     devices[deviceIndex].name = name;
     devices[deviceIndex].token = token;
@@ -162,7 +122,7 @@ int addDevice(const char* name, const char* token, void (*callback)(char*, byte*
     devices[deviceIndex].mqttClient = new PubSubClient(*devices[deviceIndex].wifiClient);
     devices[deviceIndex].connected = false;
     devices[deviceIndex].callback = callback;
-    devices[deviceIndex].mqttClient->setServer(THINGSBOARD_SERVER, THINGSBOARD_PORT);
+    devices[deviceIndex].mqttClient->setServer("app.coreiot.io", 1883);
     devices[deviceIndex].mqttClient->setBufferSize(16384);
     if (callback != nullptr) {
         devices[deviceIndex].mqttClient->setCallback(callback);
@@ -192,31 +152,6 @@ bool connectDeviceToThingsBoard(int deviceIndex) {
     return true;
 }
 
-// Task quản lý WiFi
-void wifiTask(void *pvParameters) {
-    for (;;) {
-        if (WiFi.status() != WL_CONNECTED) {
-            connectWifi();
-        }
-        vTaskDelay(pdMS_TO_TICKS(5000));
-    }
-}
-
-// Task quản lý thiết bị
-void deviceManagerTask(void *pvParameters) {
-    for (;;) {
-        for (int i = 0; i < deviceCount; i++) {
-            if (!connectDeviceToThingsBoard(i)) {
-                vTaskDelay(pdMS_TO_TICKS(5000));
-            }
-            if (devices[i].connected) {
-                devices[i].mqttClient->loop();
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(100));
-    }
-}
-
 // Task OTA
 void otaTask(void *pvParameters) {
     for (;;) {
@@ -242,20 +177,4 @@ void otaTask(void *pvParameters) {
 
         vTaskDelay(pdMS_TO_TICKS(500));
     }
-}
-
-
-void setup() {
-    Serial.begin(115200);
-    Serial.println("Hello 1");
-    Wire.begin(SDA_PIN, SCL_PIN);
-    dht20.begin();
-    dhtDeviceIndex = addDevice("DHT20", "s958tymnfdgw3xmiyeo8", deviceCallback);
-    Serial.printf("Added %d devices\n", deviceCount);
-    xTaskCreate(wifiTask, "WiFi Task", 4096, NULL, 1, NULL);
-    xTaskCreate(otaTask, "OTA Task", 8192, NULL, 2, NULL);
-}
-
-void loop() {
-    vTaskDelay(portMAX_DELAY); 
 }

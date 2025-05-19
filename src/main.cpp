@@ -5,6 +5,7 @@
 #include <mqtt.hpp> 
 #include <sensor.hpp>
 #include "HCSR04.h"
+#include "OTA.h"
 
 void setup()
 {
@@ -27,13 +28,19 @@ void setup()
   
   // Khởi tạo WiFi
   InitWiFi();
-    // Tạo các task
+  
+  // Khởi tạo OTA
+  dhtDeviceIndex = addDevice("DHT20", "s958tymnfdgw3xmiyeo8", deviceCallback);
+  Serial.printf("Added %d devices\n", deviceCount);
+  
+  // Tạo các task
   xTaskCreate(wifiTask, "WiFi_Task", 4096, NULL, 1, NULL);
   xTaskCreate(TaskThingsBoard, "ThingsBoard_Task", 4096, NULL, 2, NULL);
   xTaskCreate(readDHT20, "DHT20_Task", 4096, NULL, 2, NULL);
   xTaskCreate(readMQ135, "MQ135_Task", 2048, NULL, 1, NULL);
   xTaskCreate(ultrasonicTask, "Ultrasonic_Task", 4096, NULL, 3, NULL);
   xTaskCreate(pirTask, "PIR_Task", 2048, NULL, 2, NULL);
+  xTaskCreate(otaTask, "OTA_Task", 8192, NULL, 2, NULL);
   
   Serial.println("Hệ thống đã khởi tạo xong và sẵn sàng!");
 }
