@@ -11,10 +11,10 @@ extern "C" {
 //
 #define DHTTYPE DHT11
 extern DHT dht; 
-extern int airQuality;
 extern MQ135 mq135_sensor;
 void readDHT11(void *pvParameters);
 void readMQ135(void *pvParameters);
+String getAQICategory(int aqi);
 
 
 
