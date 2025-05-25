@@ -1,158 +1,360 @@
-# 🚗 Hệ thống nhận diện biển số xe
+# 🎯 Hệ Thống Kiểm Soát Truy Cập Tích Hợp
 
-Đây là một hệ thống nhận diện biển số xe sử dụng AI với YOLOv8 và Tesseract OCR, được xây dựng bằng Flask để streaming video trực tiếp.
+Hệ thống kết hợp **RFID MQTT Access Control** và **License Plate Detection** sử dụng camera để tạo một giải pháp kiểm soát truy cập hoàn chỉnh.
 
-## ✨ Tính năng
+## 🏗️ Kiến Trúc Hệ Thống
 
-- 🎥 **Streaming video trực tiếp** từ camera
-- 🔍 **Phát hiện biển số xe** sử dụng YOLOv8
-- 📝 **Trích xuất văn bản** từ biển số bằng Tesseract OCR
-- 📸 **Chụp ảnh** toàn bộ khung hình hoặc vùng phát hiện
-- 💾 **Lưu trữ tự động** ảnh biển số được phát hiện
-- 🌐 **Giao diện web** thân thiện
-
-## 📋 Yêu cầu hệ thống
-
-- Python 3.7+
-- Camera (webcam hoặc camera USB)
-- Tesseract OCR đã được cài đặt
-
-## 🛠️ Cài đặt
-
-### 1. Cài đặt các thư viện Python
-
-```bash
-pip install flask opencv-python ultralytics pytesseract pillow numpy pandas matplotlib seaborn torch
+```
+┌─────────────────┐    MQTT     ┌─────────────────┐    HTTP    ┌─────────────────┐
+│   RFID Reader   │◄──────────►│  MQTT Broker    │◄─────────►│   Flask Server   │
+│   (ESP32/Arduino)│             │ test.mosquitto.org│          │  (video_camera.py)│
+└─────────────────┘             └─────────────────┘            └─────────────────┘
+                                          │                              │
+                                          │                              │
+                                          ▼                              ▼
+                                ┌─────────────────┐            ┌─────────────────┐
+                                │  RFID MQTT      │            │   Camera +      │
+                                │   Server        │            │ License Plate   │
+                                │                 │            │   Detection     │
+                                └─────────────────┘            └─────────────────┘
+                                          │                              │
+                                          │                              │
+                                          ▼                              ▼
+                                ┌─────────────────┐            ┌─────────────────┐
+                                │   MongoDB       │            │   Snapshot      │
+                                │  (Whitelist)    │            │   Storage       │
+                                └─────────────────┘            └─────────────────┘
 ```
 
-### 2. Cài đặt Tesseract OCR
+## 🚀 Cài Đặt và Khởi Động
 
-- **Windows**: Tải từ [GitHub releases](https://github.com/UB-Mannheim/tesseract/wiki)
-- **Ubuntu/Debian**: `sudo apt install tesseract-ocr`
-- **macOS**: `brew install tesseract`
-
-### 3. Cấu hình đường dẫn Tesseract (Windows)
-
-Đảm bảo đường dẫn trong file `camera.py` chính xác:
-```python
-pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
-```
-
-## 🚀 Cách sử dụng
-
-### 1. Kiểm tra hệ thống
+### 1. Cài đặt Dependencies
 
 ```bash
-python test_camera.py
+pip install -r requirements.txt
 ```
 
-### 2. Chạy ứng dụng web
+### 2. Khởi động MongoDB (Tùy chọn)
 
 ```bash
+# Cài đặt MongoDB Community Edition
+# Hoặc sử dụng MongoDB Atlas (cloud)
+mongod --dbpath ./data
+```
+
+### 3. Khởi động Hệ thống
+
+#### Option 1: Sử dụng Startup Script (Khuyên dùng)
+
+```bash
+python startup.py
+```
+
+Chọn chế độ khởi động:
+- **1**: Hệ thống tích hợp (RFID + Camera)
+- **2**: Chỉ RFID MQTT Server  
+- **3**: Chỉ Camera System
+- **4**: Test hệ thống
+- **5**: Xem cấu hình
+
+#### Option 2: Khởi động thủ công
+
+```bash
+# Khởi động hệ thống tích hợp
 python video_camera.py
+
+# Hoặc chỉ RFID server
+python rfid_mqtt_server.py
 ```
 
-### 3. Truy cập giao diện web
+## 📡 MQTT Configuration
 
-Mở trình duyệt và truy cập: `http://localhost:5000`
+### Topics
+- **Subscribe**: `yolouno/rfid/scan` - Nhận UID từ thiết bị RFID
+- **Publish**: `yolouno/rfid/response` - Gửi kết quả xác thực
 
-## 📁 Cấu trúc thư mục
+### Message Format
 
-```
-BTL_IOT/Test/
-├── camera.py              # Lớp VideoCamera và các hàm xử lý
-├── video_camera.py        # Flask application
-├── test_camera.py         # Script kiểm tra hệ thống
-├── templates/
-│   └── index.html         # Giao diện web
-├── Data/
-│   ├── image/             # Thư mục lưu ảnh biển số
-│   └── license-plate-dataset/  # Dataset huấn luyện
-└── runs/detect/train7/weights/best.pt  # Model YOLOv8 đã huấn luyện
+#### Gửi UID (từ thiết bị RFID):
+```json
+{
+  "uid": "A1B2C3D4",
+  "device_id": "RFID_READER_001",
+  "timestamp": "2025-05-25T10:30:00"
+}
 ```
 
-## 🎯 API Endpoints
+#### Nhận Response (từ server):
+```json
+{
+  "uid": "A1B2C3D4",
+  "allowed": true,
+  "name": "Nguyễn Văn A",
+  "department": "IT",
+  "message": "Truy cập được phép",
+  "timestamp": "2025-05-25T10:30:01",
+  "device_id": "RFID_READER_001"
+}
+```
 
-- `GET /` - Trang chủ với giao diện streaming
-- `GET /video_feed` - Stream video trực tiếp
-- `GET /snapshot?flag=1&crop=0` - Chụp ảnh toàn bộ
-- `GET /snapshot?flag=1&crop=1` - Chụp ảnh vùng phát hiện
+## 🌐 Web Interface & APIs
 
-## ⚙️ Cấu hình
+### Truy cập Web Interface
+- **URL**: http://localhost:5000
+- **Video Feed**: http://localhost:5000/video_feed
+- **Snapshot**: http://localhost:5000/snapshot?flag=1&crop=1
 
-### Thay đổi camera
+### REST APIs
 
-Sửa đổi trong file `video_camera.py`:
+#### Camera APIs
+```bash
+# Lấy trạng thái camera
+GET /status
+
+# Chụp ảnh
+GET /snapshot?flag=1&crop=1
+```
+
+#### RFID APIs
+```bash
+# Trạng thái RFID server
+GET /rfid/status
+
+# Lấy danh sách thẻ
+GET /rfid/whitelist
+
+# Thêm thẻ mới
+POST /rfid/add_card
+Content-Type: application/json
+{
+  "uid": "NEW12345",
+  "name": "Nguyễn Văn X",
+  "department": "Marketing"
+}
+
+# Xóa thẻ
+POST /rfid/remove_card
+Content-Type: application/json
+{
+  "uid": "OLD12345"
+}
+
+# Test UID
+POST /rfid/test_uid
+Content-Type: application/json
+{
+  "uid": "A1B2C3D4"
+}
+```
+
+## 🧪 Testing & Demo
+
+### 1. Test Database
+```bash
+python whitelist_db.py
+```
+
+### 2. Demo RFID MQTT
+```bash
+python rfid_demo.py
+```
+
+### 3. Kiểm tra hệ thống
+```bash
+python startup.py
+# Chọn option 4: Test hệ thống
+```
+
+## 🗃️ Database Schema
+
+### Whitelist Collection (MongoDB)
+```json
+{
+  "_id": ObjectId("..."),
+  "uid": "A1B2C3D4",
+  "name": "Nguyễn Văn A",
+  "department": "IT",
+  "status": "active",
+  "created_at": ISODate("2025-05-25T10:00:00Z"),
+  "updated_at": ISODate("2025-05-25T10:00:00Z")
+}
+```
+
+### Access Logs Collection
+```json
+{
+  "_id": ObjectId("..."),
+  "uid": "A1B2C3D4",
+  "allowed": true,
+  "timestamp": ISODate("2025-05-25T10:30:00Z"),
+  "additional_info": {
+    "device_id": "RFID_READER_001",
+    "topic": "yolouno/rfid/scan"
+  }
+}
+```
+
+## ⚙️ Cấu Hình
+
+### mqtt_config.py
 ```python
-# Thay đổi index camera (0 = camera mặc định, 1 = camera thứ 2, ...)
-VideoCamera(camera_index=0)
+# MQTT Configuration
+MQTT_BROKER = "test.mosquitto.org"
+MQTT_PORT = 1883
+TOPIC_SUB = "yolouno/rfid/scan"
+TOPIC_PUB = "yolouno/rfid/response"
+
+# MongoDB Configuration  
+MONGODB_URI = "mongodb://localhost:27017/"
+DATABASE_NAME = "rfid_system"
+COLLECTION_NAME = "whitelist"
+
+# Flask Configuration
+FLASK_HOST = "127.0.0.1"
+FLASK_PORT = 5000
 ```
 
-### Điều chỉnh độ tin cậy
+## 🔧 Tích Hợp với Thiết Bị RFID
 
-Trong file `camera.py`, class `VideoCamera`, method `get_frame()`:
-```python
-# Thay đổi ngưỡng confidence (mặc định: 0.5)
-if conf > 0.5:  # Tăng để giảm false positive, giảm để tăng sensitivity
+### Arduino/ESP32 Example
+```cpp
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <MFRC522.h>
+
+// MQTT settings
+const char* mqtt_server = "test.mosquitto.org";
+const char* topic_pub = "yolouno/rfid/scan";
+const char* topic_sub = "yolouno/rfid/response";
+
+void publishRFID(String uid) {
+  StaticJsonDocument<200> doc;
+  doc["uid"] = uid;
+  doc["device_id"] = "ESP32_READER_001";
+  doc["timestamp"] = getISOTimestamp();
+  
+  String message;
+  serializeJson(doc, message);
+  
+  client.publish(topic_pub, message.c_str());
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  StaticJsonDocument<300> doc;
+  deserializeJson(doc, payload, length);
+  
+  bool allowed = doc["allowed"];
+  String name = doc["name"];
+  
+  if (allowed) {
+    // Mở cửa/LED xanh
+    digitalWrite(GREEN_LED, HIGH);
+    Serial.println("Access GRANTED for: " + name);
+  } else {
+    // LED đỏ/buzzer
+    digitalWrite(RED_LED, HIGH);
+    Serial.println("Access DENIED");
+  }
+}
 ```
 
-### Cấu hình OCR
+## 📊 Tính Năng Chính
 
-Điều chỉnh config Tesseract trong hàm `extract_plate_text()`:
-```python
-# PSM modes:
-# 6: Uniform block of text
-# 7: Single text line
-# 8: Single word
-# 13: Raw line (no assumptions)
-text = pytesseract.image_to_string(gray_plate, config='--psm 7')
+### 🔐 RFID Access Control
+- ✅ Xác thực UID theo whitelist MongoDB
+- ✅ MQTT real-time communication
+- ✅ Logging tất cả access attempts
+- ✅ RESTful API management
+- ✅ Web-based whitelist management
+
+### 📸 Camera System  
+- ✅ Live video streaming
+- ✅ License plate detection với YOLO
+- ✅ HTTP snapshot API
+- ✅ Automatic image capture khi access granted
+- ✅ Cropped vehicle image saving
+
+### 🔗 Integration Features
+- ✅ Automatic camera trigger khi RFID granted
+- ✅ Unified web interface
+- ✅ Combined logging system
+- ✅ Single startup script
+- ✅ Health monitoring cho tất cả components
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+#### 1. MongoDB Connection Error
+```bash
+# Kiểm tra MongoDB service
+mongod --version
+
+# Khởi động MongoDB
+mongod --dbpath ./data
 ```
 
-## 🔧 Troubleshooting
+#### 2. Camera Not Found
+```bash
+# Kiểm tra camera devices
+python -c "import cv2; print(cv2.VideoCapture(0).isOpened())"
+```
 
-### Lỗi camera không hoạt động
-- Kiểm tra camera có được kết nối đúng
-- Thử thay đổi camera_index (0, 1, 2...)
-- Đảm bảo không có ứng dụng nào khác đang sử dụng camera
+#### 3. MQTT Connection Failed
+```bash
+# Test MQTT broker
+pip install paho-mqtt
+python -c "import paho.mqtt.client as mqtt; c=mqtt.Client(); print(c.connect('test.mosquitto.org', 1883, 60))"
+```
 
-### Lỗi model không tải được
-- Kiểm tra đường dẫn file model trong `camera.py`
-- Đảm bảo file `best.pt` tồn tại trong `runs/detect/train7/weights/`
+#### 4. Dependencies Missing
+```bash
+# Reinstall requirements
+pip install -r requirements.txt --force-reinstall
+```
 
-### Lỗi Tesseract
-- Kiểm tra Tesseract đã được cài đặt
-- Cập nhật đường dẫn `tesseract_cmd` cho đúng
+## 📝 Logs & Monitoring
 
-### Hiệu suất chậm
-- Giảm độ phân giải camera
-- Tăng ngưỡng confidence để giảm số lượng detection
-- Sử dụng GPU nếu có thể
+### Log Locations
+- **Application Logs**: Console output
+- **Access Logs**: MongoDB `access_logs` collection
+- **Camera Images**: `mqtt_snapshots/` directory
+- **Error Logs**: Python logging output
 
-## 📊 Hiệu suất
+### Health Check URLs
+- **System Status**: http://localhost:5000/status
+- **RFID Status**: http://localhost:5000/rfid/status
+- **Whitelist Count**: http://localhost:5000/rfid/whitelist
 
-- **FPS**: ~10-15 FPS (tùy thuộc vào hardware)
-- **Độ chính xác phát hiện**: ~90% (tùy thuộc vào điều kiện ánh sáng và góc chụp)
-- **Độ chính xác OCR**: ~85% (tùy thuộc vào chất lượng biển số)
+## 🔒 Security Considerations
 
-## 🤝 Đóng góp
+1. **MongoDB**: Sử dụng authentication trong production
+2. **MQTT**: Sử dụng SSL/TLS và authentication
+3. **Flask**: Thêm authentication cho web interface
+4. **Network**: Firewall rules cho MQTT port 1883
+5. **Camera**: Secure camera feed access
 
-1. Fork project
-2. Tạo feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Mở Pull Request
+## 📞 Support
 
-## 📝 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
-## 📞 Hỗ trợ
-
-Nếu bạn gặp vấn đề, hãy:
-1. Chạy `python test_camera.py` để kiểm tra hệ thống
-2. Kiểm tra console log để xem thông báo lỗi
-3. Tạo issue trên GitHub với thông tin chi tiết
+Nếu gặp vấn đề, hãy:
+1. Chạy `python startup.py` → option 4 (Test hệ thống)
+2. Kiểm tra logs trong console
+3. Verify dependencies với `pip list`
+4. Test từng component riêng biệt
 
 ---
 
-**Chúc bạn sử dụng thành công! 🎉**
+## 📋 Checklist Triển Khai
+
+- [ ] Cài đặt Python 3.7+
+- [ ] Cài đặt MongoDB (hoặc cấu hình MongoDB Atlas)
+- [ ] Clone/download source code
+- [ ] Chạy `pip install -r requirements.txt`
+- [ ] Cấu hình `mqtt_config.py` nếu cần
+- [ ] Test camera với `python -c "import cv2; cv2.VideoCapture(0).read()"`
+- [ ] Khởi động hệ thống với `python startup.py`
+- [ ] Test RFID với `python rfid_demo.py`
+- [ ] Verify web interface tại http://localhost:5000
+
+🎉 **Hệ thống sẵn sàng hoạt động!**
