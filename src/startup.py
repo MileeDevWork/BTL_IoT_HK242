@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Startup script cho hệ thống kiểm soát truy cập tích hợp
-Kết hợp RFID MQTT + Camera License Plate Detection
-"""
 
 import os
 import sys

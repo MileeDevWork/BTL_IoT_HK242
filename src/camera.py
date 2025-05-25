@@ -1,4 +1,3 @@
-# filepath: c:\Users\Dell\Desktop\Study\Allproject\BTL_IOT\Test\camera_fixed.py
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -21,7 +20,8 @@ import subprocess  # For executing ffmpeg
 # from IPython.display import display  # Import display for showing images
 import glob  # Import glob for file pattern matching
 from datetime import datetime  # For timestamp generation
-
+from whitelist_db import WhitelistDB  # Import database functionality
+# from run.detect.train7.weights import best  # Import the trained YOLOv8 model
 # Define dataset paths relative to script directory to create absolute paths
 script_dir = os.path.dirname(os.path.abspath(__file__))
 train_dir = os.path.join(script_dir, "Data", "license-plate-dataset", "images", "train")
@@ -33,7 +33,7 @@ classes = ["license_plate"]  # Add more classes if needed
 pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
 
 # Load the trained YOLOv8 model (assuming you have already trained it)
-model_path = "runs/detect/train7/weights/best.pt" # Replace with your model path
+model_path = "../runs/detect/train7/weights/best.pt"  # Updated path to go up one directory
 model = YOLO(model_path)
 
 # Example of processing a single image and extracting text
@@ -52,24 +52,23 @@ def extract_plate_text(image_path, model):
     results = model(image_path)
 
     for result in results:
-        if result.boxes is not None:
-            for box in result.boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                conf = box.conf[0].item()
+        for box in result.boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            conf = box.conf[0].item()
 
-                # Crop the license plate region
-                cropped_plate = cv2.imread(image_path)[y1:y2, x1:x2]
+            # Crop the license plate region
+            cropped_plate = cv2.imread(image_path)[y1:y2, x1:x2]
 
-                # Convert the cropped image to grayscale for better OCR results
-                gray_plate = cv2.cvtColor(cropped_plate, cv2.COLOR_BGR2GRAY)
+            # Convert the cropped image to grayscale for better OCR results
+            gray_plate = cv2.cvtColor(cropped_plate, cv2.COLOR_BGR2GRAY)
 
-                # Use pytesseract to extract text
-                try:
-                    text = pytesseract.image_to_string(gray_plate, config='--psm 7') # psm 7 is good for single text line
-                    extracted_texts.append(text.strip())
-                except Exception as e:
-                    print(f"Error during OCR: {e}")
-                    extracted_texts.append("") # Append empty string if OCR fails
+            # Use pytesseract to extract text
+            try:
+                text = pytesseract.image_to_string(gray_plate, config='--psm 7') # psm 7 is good for single text line
+                extracted_texts.append(text.strip())
+            except Exception as e:
+                print(f"Error during OCR: {e}")
+                extracted_texts.append("") # Append empty string if OCR fails
 
     return extracted_texts
 
@@ -88,6 +87,14 @@ class VideoCamera:
         self.save_dir = os.path.join(script_dir, "Data", "image")
         self.is_open = False
         
+        # Initialize database connection
+        try:
+            self.db = WhitelistDB()
+            print("Database connection established for license plate storage")
+        except Exception as e:
+            print(f"Warning: Could not connect to database: {e}")
+            self.db = None
+        
         # Create save directory if it doesn't exist
         os.makedirs(self.save_dir, exist_ok=True)
         
@@ -100,7 +107,7 @@ class VideoCamera:
                 return True
             else:
                 return False
-        return True
+            return True
         
     def close_camera(self):
         """Close camera connection"""
@@ -130,10 +137,8 @@ class VideoCamera:
         Returns:
             bytes: JPEG encoded frame
         """
-        # Ensure camera is open
-        if not self.is_open:
-            if not self.open_camera():
-                return None
+        if not self.cap:
+            self.cap = cv2.VideoCapture(self.camera_index)
             
         if not self.cap.isOpened():
             return None
@@ -162,31 +167,69 @@ class VideoCamera:
                         if save_plate:
                             # Crop the license plate region
                             cropped_plate = frame[y1:y2, x1:x2]
-                            
-                            # Extract text from the license plate
+                              # Extract text from the license plate
                             try:
+                                # Preprocess image for better OCR
                                 gray_plate = cv2.cvtColor(cropped_plate, cv2.COLOR_BGR2GRAY)
-                                text = pytesseract.image_to_string(gray_plate, config='--psm 7').strip()
+                                
+                                # Apply image enhancement for better OCR
+                                # Resize image to improve OCR accuracy
+                                height, width = gray_plate.shape
+                                if height < 50:  # If image is too small, resize
+                                    scale_factor = 3
+                                    gray_plate = cv2.resize(gray_plate, (width * scale_factor, height * scale_factor))
+                                
+                                # Apply Gaussian blur to reduce noise
+                                gray_plate = cv2.GaussianBlur(gray_plate, (3, 3), 0)
+                                
+                                # Apply adaptive threshold to improve contrast
+                                gray_plate = cv2.adaptiveThreshold(gray_plate, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+                                
+                                # Try multiple OCR configurations for Vietnamese license plates
+                                ocr_configs = [
+                                    '--psm 8 -c tessedit_char_whitelist=-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.',  # Single word, alphanumeric only
+                                    '--psm 7 -c tessedit_char_whitelist=-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.',  # Single text line
+                                    '--psm 6',  # Single uniform block of text
+                                ]
+                                
+                                text = ""
+                                for config in ocr_configs:
+                                    try:
+                                        text = pytesseract.image_to_string(gray_plate, config=config).strip()
+                                        # Clean up the text - remove non-alphanumeric characters
+                                        text = ''.join(char for char in text if char.isalnum())
+                                        if text and len(text) >= 4:  # Valid plate should have at least 4 characters
+                                            break
+                                    except:
+                                        continue
                                 
                                 # Save the cropped license plate with timestamp
-                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+                                from datetime import datetime
+                                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                                 filename = f"license_plate_{timestamp}.jpg"
                                 save_path = os.path.join(self.save_dir, filename)
                                 cv2.imwrite(save_path, cropped_plate)
-                                
-                                # Print detected text
+                                  # Print detected text
                                 if text:
-                                    print(f"📸 Detected license plate text: {text}")
-                                    print(f"💾 Saved to: {filename}")
+                                    print(f"Detected license plate text: {text}")
                                     # Add text to the frame
                                     cv2.putText(frame, f'Text: {text}', 
                                               (x1, y2+20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-                                else:
-                                    print(f"📸 License plate detected but no text extracted")
-                                    print(f"💾 Saved to: {filename}")
+                                      # Save to database if connected
+                                    if self.db:
+                                        try:
+                                            self.db.save_license_plate(
+                                                plate_text=text,
+                                                image_path=save_path
+                                            )
+                                            print(f"License plate '{text}' saved to database")
+                                        except Exception as db_error:
+                                            print(f"Error saving to database: {db_error}")
+                                    else:
+                                        print("Database not connected - skipping save")
                                 
                             except Exception as e:
-                                print(f"❌ Error during OCR: {e}")
+                                print(f"Error during OCR: {e}")
         
         # If crop_vehicle is True and we're saving, return the cropped vehicle region
         if crop_vehicle and save_plate:
@@ -215,12 +258,52 @@ class VideoCamera:
         ret, jpeg = cv2.imencode('.jpg', frame)
         if ret:
             return jpeg.tobytes()
+        else:            return None
+    
+    def get_recent_license_plates(self, limit=10):
+        """
+        Get recently detected license plates from database.
+        
+        Args:
+            limit (int): Maximum number of records to return
+            
+        Returns:
+            list: List of license plate records or empty list if no database connection
+        """
+        if self.db:
+            try:
+                return self.db.get_license_plates(limit=limit)
+            except Exception as e:
+                print(f"Error retrieving license plates: {e}")
+                return []
         else:
-            return None
+            print("Database not connected")
+            return []
+    
+    def search_license_plate(self, plate_text):
+        """
+        Search for a specific license plate in the database.
+        
+        Args:
+            plate_text (str): License plate text to search for
+            
+        Returns:
+            list: List of matching records or empty list if no database connection
+        """
+        if self.db:
+            try:
+                return self.db.search_license_plate(plate_text)
+            except Exception as e:
+                print(f"Error searching license plate: {e}")
+                return []
+        else:
+            print("Database not connected")
+            return []
             
     def __del__(self):
         """Destructor to release camera"""
-        self.close_camera()
+        if self.cap:
+            self.cap.release()
 
 # Function to extract text from image frame (for direct use)
 def extract_plate_text_from_frame(frame, model):

@@ -202,7 +202,21 @@ def start_rfid_server():
             if rfid_server is None:
                 rfid_server = RFIDMQTTServer()
                 print("🚀 Đang khởi động RFID MQTT Server...")
-                rfid_server.start()
+                
+                # Khởi động RFID server trong thread riêng để không block Flask
+                def run_rfid_server():
+                    try:
+                        rfid_server.start()
+                    except Exception as e:
+                        print(f"❌ Lỗi RFID Server thread: {e}")
+                
+                rfid_thread = threading.Thread(target=run_rfid_server, daemon=True)
+                rfid_thread.start()
+                
+                # Chờ một chút để RFID server khởi động
+                time.sleep(2)
+                print("✅ RFID Server thread đã khởi động")
+                
     except Exception as e:
         print(f"❌ Lỗi khởi động RFID Server: {e}")
 

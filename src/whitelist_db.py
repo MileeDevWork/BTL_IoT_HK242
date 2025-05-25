@@ -14,6 +14,8 @@ class WhitelistDB:
             self.client = pymongo.MongoClient(MONGODB_URI)
             self.db = self.client[DATABASE_NAME]
             self.collection = self.db[COLLECTION_NAME]
+            # Thêm collection cho license plates
+            self.license_plates_collection = self.db["license_plates"]
             logger.info("✅ Đã kết nối MongoDB thành công")
             
             # Tạo sample data nếu collection trống
@@ -176,6 +178,77 @@ class WhitelistDB:
             
         except Exception as e:
             logger.error(f"❌ Lỗi ghi log: {e}")
+    
+    def save_license_plate(self, plate_text, image_path=None):
+        """
+        Lưu thông tin biển số xe vào database
+        
+        Args:
+            plate_text (str): Text của biển số xe
+            image_path (str): Đường dẫn đến file ảnh (tùy chọn)
+            
+        Returns:
+            str: ID của record được tạo, hoặc None nếu lỗi
+        """
+        try:
+            if not plate_text or not plate_text.strip():
+                logger.warning("⚠️ Plate text trống, không lưu vào database")
+                return None
+                
+            plate_data = {
+                "plate": plate_text.strip(),
+                "time_in": datetime.now(),
+                "image_path": image_path,
+                "created_at": datetime.now()
+            }
+            
+            result = self.license_plates_collection.insert_one(plate_data)
+            plate_id = str(result.inserted_id)
+            
+            logger.info(f"💾 Đã lưu biển số: {plate_text} với ID: {plate_id}")
+            return plate_id
+            
+        except Exception as e:
+            logger.error(f"❌ Lỗi lưu biển số {plate_text}: {e}")
+            return None
+    
+    def get_license_plates(self, limit=50):
+        """
+        Lấy danh sách biển số xe đã lưu
+        
+        Args:
+            limit (int): Số lượng record tối đa trả về
+            
+        Returns:
+            list: Danh sách các record biển số xe
+        """
+        try:
+            plates = list(self.license_plates_collection.find()
+                         .sort("time_in", -1)  # Sắp xếp theo thời gian mới nhất
+                         .limit(limit))
+            return plates
+        except Exception as e:
+            logger.error(f"❌ Lỗi lấy danh sách biển số: {e}")
+            return []
+    
+    def search_license_plate(self, plate_text):
+        """
+        Tìm kiếm biển số xe trong database
+        
+        Args:
+            plate_text (str): Text biển số cần tìm
+            
+        Returns:
+            list: Danh sách các record matching
+        """
+        try:
+            plates = list(self.license_plates_collection.find({
+                "plate": {"$regex": plate_text, "$options": "i"}  # Tìm kiếm không phân biệt hoa thường
+            }).sort("time_in", -1))
+            return plates
+        except Exception as e:
+            logger.error(f"❌ Lỗi tìm kiếm biển số {plate_text}: {e}")
+            return []
 
 # Test functions
 if __name__ == "__main__":
