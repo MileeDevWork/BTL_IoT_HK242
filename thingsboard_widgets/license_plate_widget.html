@@ -1,0 +1,152 @@
+<!-- ThingsBoard Widget HTML Template -->
+<div class="license-plate-widget" style="height: 100%; overflow: hidden;">
+    <!-- Header -->
+    <div class="widget-header" style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 10px; border-radius: 8px 8px 0 0;">
+        <h5 style="margin: 0; display: flex; align-items: center;">
+            <i class="material-icons" style="margin-right: 8px;">camera_alt</i>
+            Hệ thống Nhận diện Biển số
+        </h5>
+    </div>
+
+    <!-- Main Content -->
+    <div class="widget-content" style="padding: 15px; height: calc(100% - 60px); overflow-y: auto;">
+        <!-- Camera Section -->
+        <div class="camera-section" style="margin-bottom: 20px;">
+            <div class="camera-container" style="position: relative; background: #f8f9fa; border-radius: 8px; padding: 10px; text-align: center;">
+                <img id="video-stream" 
+                     src="http://localhost:5000/video_feed" 
+                     style="max-width: 100%; max-height: 300px; border-radius: 8px; border: 2px solid #007bff;"
+                     alt="Live video stream"
+                     onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZjlmYSIvPjx0ZXh0IHg9IjE1MCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM2Yzc1N2QiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkNhbWVyYSBLaG9uZyBIb+G6oXQgxJDhu5luZzwvdGV4dD48L3N2Zz4=';">
+                
+                <!-- Camera Status Overlay -->
+                <div id="camera-status" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px;">
+                    <span id="status-indicator" style="display: inline-block; width: 8px; height: 8px; background: #28a745; border-radius: 50%; margin-right: 5px; animation: pulse 2s infinite;"></span>
+                    <span id="status-text">Live</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+            <button id="snapshot-btn" 
+                    style="background: #007bff; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 500; transition: all 0.2s ease;"
+                    onmouseover="this.style.background='#0056b3'; this.style.transform='translateY(-1px)'"
+                    onmouseout="this.style.background='#007bff'; this.style.transform='translateY(0)'">
+                📸 Chụp ảnh
+            </button>
+            <button id="extract-plate-btn" 
+                    style="background: #28a745; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 500; transition: all 0.2s ease;"
+                    onmouseover="this.style.background='#1e7e34'; this.style.transform='translateY(-1px)'"
+                    onmouseout="this.style.background='#28a745'; this.style.transform='translateY(0)'">
+                🔍 Trích xuất biển số
+            </button>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="status-messages" style="margin-bottom: 15px;"></div>
+
+        <!-- License Plate Edit Section (Hidden by default) -->
+        <div id="plate-edit-section" style="display: none; background: #f8f9fa; border-radius: 8px; padding: 15px; border: 2px solid #007bff;">
+            <h6 style="margin: 0 0 15px 0; color: #007bff; display: flex; align-items: center;">
+                <i class="material-icons" style="margin-right: 8px;">edit</i>
+                Chỉnh sửa biển số xe
+            </h6>
+            
+            <div class="edit-content" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <!-- Captured Image -->
+                <div class="image-section">
+                    <p style="margin: 0 0 10px 0; font-weight: 500;">Ảnh đã chụp:</p>
+                    <img id="captured-image" 
+                         style="width: 100%; max-height: 200px; object-fit: contain; border-radius: 8px; border: 1px solid #dee2e6;"
+                         alt="Captured image">
+                </div>
+                
+                <!-- Edit Form -->
+                <div class="form-section">
+                    <div id="extraction-info" style="margin-bottom: 15px;"></div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Biển số xe:</label>
+                        <input type="text" id="plate-input" 
+                               style="width: 100%; padding: 10px; border: 2px solid #007bff; border-radius: 8px; font-size: 16px; font-weight: bold; text-align: center; text-transform: uppercase;"
+                               placeholder="VD: 30A-12345">
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">UID thẻ (tùy chọn):</label>
+                        <input type="text" id="uid-input" 
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 6px;"
+                               placeholder="Nhập UID nếu có">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button id="save-plate-btn" 
+                                style="background: #28a745; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                            💾 Lưu
+                        </button>
+                        <button id="cancel-edit-btn" 
+                                style="background: #6c757d; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 500;">
+                            ❌ Hủy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Plates -->
+        <div id="recent-plates-section" style="background: white; border-radius: 8px; padding: 15px; border: 1px solid #dee2e6;">
+            <h6 style="margin: 0 0 15px 0; color: #495057; display: flex; align-items: center;">
+                <i class="material-icons" style="margin-right: 8px;">history</i>
+                Biển số gần đây
+            </h6>
+            <div id="recent-plates-list" style="max-height: 200px; overflow-y: auto;">
+                <div style="text-align: center; color: #6c757d; padding: 20px;">
+                    <i class="material-icons" style="font-size: 48px; opacity: 0.5;">search</i>
+                    <p style="margin: 10px 0 0 0;">Chưa có dữ liệu</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Keyframe animations -->
+<style>
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.plate-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 5px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #007bff;
+}
+
+.plate-item:hover {
+    background: #e9ecef;
+    transform: translateX(2px);
+    transition: all 0.2s ease;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
