@@ -6,7 +6,7 @@ import time
 import requests
 from datetime import datetime
 from whitelist_db import WhitelistDB
-from mqtt_config import *
+from mqtt.mqtt_config import *
 
 # Setup logging
 logging.basicConfig(

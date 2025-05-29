@@ -1,7 +1,7 @@
 import pymongo
 from datetime import datetime
 import logging
-from mqtt_config import MONGODB_URI, DATABASE_NAME, COLLECTION_NAME
+from mqtt.mqtt_config import MONGODB_URI, DATABASE_NAME, COLLECTION_NAME
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

@@ -1,6 +1,6 @@
 from flask import Flask, render_template, Response, request, abort, jsonify
 from flask_cors import CORS
-from camera import VideoCamera
+from camera.camera import VideoCamera
 import threading
 import time
 import cv2
@@ -11,9 +11,9 @@ from datetime import datetime
 
 # Import RFID MQTT components
 try:
-    from rfid_mqtt_server_v2 import RFIDMQTTServer  # Sử dụng version 2 với hỗ trợ vào/ra
+    from rfid.rfid_mqtt_server_v2 import RFIDMQTTServer  # Sử dụng version 2 với hỗ trợ vào/ra
 except ImportError:
-    from rfid_mqtt_server import RFIDMQTTServer  # Fallback to original version
+    from rfid.rfid_mqtt_server import RFIDMQTTServer  # Fallback to original version
 from whitelist_db import WhitelistDB
 
 app = Flask(__name__)
@@ -92,7 +92,7 @@ def snapshot():
                 f.write(frame)
             
             # Trích xuất biển số bằng camera module
-            from camera import extract_plate_text, model
+            from camera.camera import extract_plate_text, model
             plate_texts = extract_plate_text(temp_path, model)
             
             # Xóa file tạm
@@ -597,7 +597,7 @@ def plate_edit():
                     f.write(frame)
                 
                 try:
-                    from camera import extract_plate_text, model
+                    from camera.camera import extract_plate_text, model
                     plate_texts = extract_plate_text(temp_path, model)
                     
                     extraction_result = {

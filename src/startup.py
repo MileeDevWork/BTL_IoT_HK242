@@ -229,7 +229,7 @@ def test_system():
     try:
         # Test database
         print("1. Kiểm tra Database...")
-        from whitelist_db import WhitelistDB
+        from Database.whitelist_db import WhitelistDB
         db = WhitelistDB()
         cards = db.get_all_cards()
         print(f"   ✅ Database: {len(cards)} thẻ trong whitelist")
@@ -241,7 +241,7 @@ def test_system():
         
         # Test MQTT config
         print("2. Kiểm tra MQTT Config...")
-        from mqtt_config import MQTT_BROKER, MQTT_PORT, TOPIC_SUB, TOPIC_PUB
+        from mqtt.mqtt_config import MQTT_BROKER, MQTT_PORT, TOPIC_SUB, TOPIC_PUB
         print(f"   ✅ MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
         print(f"   ✅ Subscribe: {TOPIC_SUB}")
         print(f"   ✅ Publish: {TOPIC_PUB}")
@@ -257,7 +257,7 @@ def show_config():
     print("-" * 40)
     
     try:
-        import mqtt_config
+        import mqtt.mqtt_config as mqtt_config
         
         print("🔐 RFID MQTT Configuration:")
         print(f"  - MQTT Broker: {mqtt_config.MQTT_BROKER}:{mqtt_config.MQTT_PORT}")
