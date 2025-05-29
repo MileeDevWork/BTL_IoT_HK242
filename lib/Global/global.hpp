@@ -13,10 +13,15 @@ extern SemaphoreHandle_t sensorDataMutex;
 extern bool dhtReady;
 extern int airQuality;
 extern String category;
+extern int peopleCount;
 
 //GPIO
 #define DHTPIN 8 // D5, DHT11
 #define MQ135_PIN 1 // MQ135
+#define TRIG_ENTER 21 //D10
+#define ECHO_ENTER 18 //D9
+
+#define pirPin 18 //D9
 
 
 
@@ -25,4 +30,4 @@ extern String category;
 }
 #endif
 
-#endif
+#endif // GLOBAL_HPP
