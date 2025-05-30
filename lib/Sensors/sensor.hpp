@@ -5,27 +5,30 @@
 #include "DHT.h"
 #include <MQ135.h>
 #include <HCSR04.h>
-
+#include "DHT20.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 //
 #define DHTTYPE DHT11
+extern DHT20 dht20;
 extern DHT dht; 
 extern MQ135 mq135_sensor;
 //biến gán để test hàm mật độ dân số
-extern UltraSonicDistanceSensor* ultrasonicSensor;
 extern bool objectDetected;
+extern bool motionDetected;
+extern UltraSonicDistanceSensor* ultrasonicSensor[10];
+extern bool CarDetected[10];
 
-
+void readDHT20(void *pvParameters);
 void readDHT11(void *pvParameters);
 void readMQ135(void *pvParameters);
 String getAQICategory(int aqi);
 void peopleCountingTask(void *pvParameters);
 void ultrasonicTask(void *pvParameters);
-
-
+void carslotTask(void *pvParameters);
+void pirTask(void *pvParameters);
 
 ///
 #ifdef __cplusplus

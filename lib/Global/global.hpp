@@ -14,6 +14,10 @@ extern bool dhtReady;
 extern int airQuality;
 extern String category;
 extern int peopleCount;
+extern bool objectDetected;
+extern bool motionDetected;
+
+
 
 //GPIO
 #define DHTPIN 8 // D5, DHT11
@@ -22,6 +26,7 @@ extern int peopleCount;
 #define ECHO_ENTER 18 //D9
 
 #define pirPin 18 //D9
+#define PIR_PIN2 19 //D10
 
 
 
