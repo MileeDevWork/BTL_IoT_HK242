@@ -1,13 +1,14 @@
 #include <mqtt.hpp>
 
+// Variable definitions for extern declarations in mqtt.hpp
 WiFiClient wifiClient;
-Arduino_MQTT_Client mqttClient_internal(wifiClient);
-Arduino_MQTT_Client &mqttClient = mqttClient_internal;  
-ThingsBoard tb(mqttClient, 1024U); 
+Arduino_MQTT_Client mqttClient(wifiClient);
+ThingsBoard tb(mqttClient);
 
+// Nhiệm vụ kết nối và gửi dữ liệu lên ThingsBoard
 void TaskThingsBoard(void *pvParameters)
 {
-  uint32_t previousDataSend = 0;
+  const DeviceConfig* config = getCurrentConfig();
 
   while (1)
   {
@@ -19,19 +20,21 @@ void TaskThingsBoard(void *pvParameters)
 
     if (!tb.connected())
     {
-      Serial.println("Đang kết nối ThingsBoard...");
-      if (!tb.connect(THINGSBOARD_SERVER, TOKEN, THINGSBOARD_PORT))
+      Serial.printf("Đang kết nối ThingsBoard %s...\n", config->deviceType);
+      if (!tb.connect(THINGSBOARD_SERVER, config->token, THINGSBOARD_PORT))
       {
-        Serial.println("Kết nối thất bại!");
+        Serial.printf("Kết nối %s thất bại!\n", config->deviceType);
         vTaskDelay(pdMS_TO_TICKS(5000)); // Thử lại sau 5 giây
         continue;
       }
       tb.sendAttributeData("macAddress", WiFi.macAddress().c_str());
-      Serial.println("Kết nối ThingsBoard thành công!");
+      tb.sendAttributeData("deviceType", config->deviceType);
+      tb.sendAttributeData("deviceName", config->deviceName);
+      Serial.printf("Kết nối ThingsBoard %s thành công!\n", config->deviceType);
     }
 
-    // Gửi dữ liệu mỗi 10 giây
-    if (millis() - previousDataSend > telemetrySendInterval)
+    // Gửi dữ liệu môi trường nếu được bật
+    if (config->enableTempHumidity && (millis() - previousDataSend > config->envSensorInterval))
     {
       previousDataSend = millis();
 
@@ -45,13 +48,13 @@ void TaskThingsBoard(void *pvParameters)
 
       if (!isnan(temp) && !isnan(hum))
       {
-        Serial.println("Gửi dữ liệu lên ThingsBoard...");
+        Serial.printf("Gửi dữ liệu môi trường lên ThingsBoard %s...\n", config->deviceType);
         tb.sendTelemetryData("temperature", temp);
         tb.sendTelemetryData("humidity", hum);
       }
       else
       {
-        Serial.println("Không có dữ liệu hợp lệ để gửi!");
+        Serial.println("Không có dữ liệu môi trường hợp lệ để gửi!");
       }
     }
 

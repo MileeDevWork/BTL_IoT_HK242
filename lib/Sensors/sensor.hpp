@@ -2,6 +2,7 @@
 #define SENSOR_HPP
 #include <global.hpp>
 #include <mqtt.hpp>
+#include <config.hpp>
 #include "DHT.h"
 #include <MQ135.h>
 #include <HCSR04.h>
@@ -29,6 +30,7 @@ void peopleCountingTask(void *pvParameters);
 void ultrasonicTask(void *pvParameters);
 void carslotTask(void *pvParameters);
 void pirTask(void *pvParameters);
+void rfidTask(void *pvParameters);
 
 ///
 #ifdef __cplusplus

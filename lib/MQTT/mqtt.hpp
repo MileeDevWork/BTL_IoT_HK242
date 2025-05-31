@@ -5,23 +5,17 @@
 #include <ThingsBoard.h>
 #include <WiFi.hpp>
 #include <global.hpp>
+#include <config.hpp>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Cấu hình coreiot
-constexpr char TOKEN[] = "OrMees1ToDgts03u5TsV";
 constexpr char THINGSBOARD_SERVER[] = "app.coreiot.io";
 constexpr uint16_t THINGSBOARD_PORT = 1883U;
 
-// Thời gian gửi dữ liệu lên coreiot
-constexpr int16_t telemetrySendInterval = 5000U;
-
-// Khai báo biến toàn cục
-extern uint32_t previousDataSend;
 extern WiFiClient wifiClient;
-extern Arduino_MQTT_Client &mqttClient;  // dùng tham chiếu
+extern Arduino_MQTT_Client mqttClient;
 extern ThingsBoard tb;
 
 void TaskThingsBoard(void *pvParameters);
@@ -30,4 +24,4 @@ void TaskThingsBoard(void *pvParameters);
 }
 #endif
 
-#endif
+#endif // MQTT_HPP
