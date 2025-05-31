@@ -93,37 +93,6 @@ String getDensityLevel(float density) {
   else
     return "Overload";
 }
-
-// void ultrasonicTask(void *pvParameters)
-// {
-//   int lastPirInState = LOW;   // Trạng thái trước đó của cảm biến vào
-//   int lastPirOutState = LOW;  // Trạng thái trước đó của cảm biến ra
-
-//   while (1)
-//   {
-//     int pirInState = digitalRead(pirPinIn);
-//     int pirOutState = digitalRead(pirPinOut);
-
-//     // Đếm người vào (cạnh lên cảm biến vào)
-//     if (pirInState == HIGH && lastPirInState == LOW)
-//     {
-//       peopleCount++;
-//       Serial.printf("Số người hiện tại: %d\n", peopleCount);
-//     }
-
-//     // Đếm người ra (cạnh lên cảm biến ra)
-//     if (pirOutState == HIGH && lastPirOutState == LOW)
-//     {
-//       if (peopleCount > 0) peopleCount--;
-//       Serial.printf("Số người hiện tại: %d\n", peopleCount);
-//     }
-
-//     lastPirInState = pirInState;
-//     lastPirOutState = pirOutState;
-//     vTaskDelay(pdMS_TO_TICKS(10));
-//   }
-// }
-
 void peopleCountingTask(void *pvParameters)
 {
   int lastPirInState = LOW;   // Trạng thái trước đó của cảm biến vào
