@@ -83,26 +83,94 @@ void readMQ135(void *pvParameters)
   }
 }
 
-void ultrasonicTask(void *pvParameters)
+
+//hàm đánh giá mật độ dân số khu vực
+String getDensityLevel(float density) {
+  if (density <= 0.2)
+    return "Good";
+  else if (density <= 0.5)
+    return "Warning";
+  else
+    return "Overload";
+}
+
+// void ultrasonicTask(void *pvParameters)
+// {
+//   int lastPirInState = LOW;   // Trạng thái trước đó của cảm biến vào
+//   int lastPirOutState = LOW;  // Trạng thái trước đó của cảm biến ra
+
+//   while (1)
+//   {
+//     int pirInState = digitalRead(pirPinIn);
+//     int pirOutState = digitalRead(pirPinOut);
+
+//     // Đếm người vào (cạnh lên cảm biến vào)
+//     if (pirInState == HIGH && lastPirInState == LOW)
+//     {
+//       peopleCount++;
+//       Serial.printf("Số người hiện tại: %d\n", peopleCount);
+//     }
+
+//     // Đếm người ra (cạnh lên cảm biến ra)
+//     if (pirOutState == HIGH && lastPirOutState == LOW)
+//     {
+//       if (peopleCount > 0) peopleCount--;
+//       Serial.printf("Số người hiện tại: %d\n", peopleCount);
+//     }
+
+//     lastPirInState = pirInState;
+//     lastPirOutState = pirOutState;
+//     vTaskDelay(pdMS_TO_TICKS(10));
+//   }
+// }
+
+void peopleCountingTask(void *pvParameters)
 {
-  int lastPirState = LOW; // Lưu trạng thái trước đó
+  int lastPirInState = LOW;   // Trạng thái trước đó của cảm biến vào
+  int lastPirOutState = LOW;  // Trạng thái trước đó của cảm biến ra
+
+  unsigned long lastSendTime = 0; // Lưu thời gian lần gửi mật độ gần nhất
 
   while (1)
   {
-    int pirState = digitalRead(pirPin);
+    int pirInState = digitalRead(pirPinIn);
+    int pirOutState = digitalRead(pirPinOut);
 
-    // Phát hiện cạnh lên: LOW -> HIGH
-    if (pirState == HIGH && lastPirState == LOW)
+    // Đếm người vào (cạnh lên cảm biến vào)
+    if (pirInState == HIGH && lastPirInState == LOW)
     {
       peopleCount++;
       Serial.printf("Số người hiện tại: %d\n", peopleCount);
     }
-    else if (pirState == LOW && lastPirState == HIGH)
+
+    // Đếm người ra (cạnh lên cảm biến ra)
+    if (pirOutState == HIGH && lastPirOutState == LOW)
     {
-      Serial.println("Không có người");
+      if (peopleCount > 0) peopleCount--;
+      Serial.printf("Số người hiện tại: %d\n", peopleCount);
     }
 
-    lastPirState = pirState; // Cập nhật trạng thái trước đó
-    vTaskDelay(pdMS_TO_TICKS(10)); // Giảm thời gian kiểm tra để bắt cạnh chính xác hơn
+    // Cập nhật lại trạng thái cũ
+    lastPirInState = pirInState;
+    lastPirOutState = pirOutState;
+
+    // Tính mật độ và gửi lên ThingsBoard mỗi 10 giây
+    if (millis() - lastSendTime >= 10000)
+    {
+      lastSendTime = millis();
+
+      float density = peopleCount / AREA_SQUARE_METERS;
+      String densityLevel = getDensityLevel(density);
+
+      Serial.printf("Mật độ dân số: %.2f người/m² (%s)\n", density, densityLevel.c_str());
+
+      if (tb.connected())
+      {
+        // tb.sendTelemetryData("density", density);
+        tb.sendTelemetryData("densityLevel", densityLevel.c_str());
+      }
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(10));
   }
 }

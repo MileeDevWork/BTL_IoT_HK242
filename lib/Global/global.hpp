@@ -21,7 +21,9 @@ extern int peopleCount;
 #define TRIG_ENTER 21 //D10
 #define ECHO_ENTER 18 //D9
 
-#define pirPin 18 //D9
+#define pirPinIn 18 //D9
+#define pirPinOut 10 //D7
+#define AREA_SQUARE_METERS 13000.0
 
 
 

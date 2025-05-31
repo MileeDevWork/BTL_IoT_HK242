@@ -12,12 +12,11 @@ void setup()
   InitWiFi();
   sensorDataMutex = xSemaphoreCreateMutex();
   pinMode(MQ135_PIN, INPUT);
-  pinMode(pirPin, INPUT);
-  xTaskCreate(ultrasonicTask, "Ultrasonic_Task", 4096, NULL, 1, NULL);
-  // xTaskCreate(readDHT11, "DHT20Task", 4096, NULL, 2, NULL);
-  // xTaskCreate(TaskThingsBoard, "ThingsBoard_Task", 4096, NULL, 2, NULL);
-  // xTaskCreate(readMQ135, "MQ135Task", 2048, NULL, 1, NULL);
-  // xTaskCreate(peopleCountingTask, "PeopleCounting", 4096, NULL, 1, NULL);
+  pinMode(pirPinIn, INPUT);
+  xTaskCreate(readDHT11, "DHT20Task", 4096, NULL, 2, NULL);
+  xTaskCreate(TaskThingsBoard, "ThingsBoard_Task", 4096, NULL, 1, NULL);
+  xTaskCreate(peopleCountingTask, "peopleCountingTask", 4096, NULL, 2, NULL);
+  xTaskCreate(readMQ135, "MQ135Task", 2048, NULL, 2, NULL);
 }
 
 void loop()
