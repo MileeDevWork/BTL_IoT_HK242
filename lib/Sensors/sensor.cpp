@@ -1,8 +1,11 @@
 #include <sensor.hpp>
 #include <global.hpp>
-DHT dht(DHTPIN, DHTTYPE);
+#include <config.hpp>
+
+// Global sensor objects - will be initialized with dynamic pins
+DHT* dht = nullptr;
 DHT20 dht20;
-MQ135 mq135_sensor(MQ135_PIN);
+MQ135* mq135_sensor = nullptr;
 
 UltraSonicDistanceSensor* ultrasonicSensor[10];  // hoặc struct wrapper
 const char* SLOT_NAMES[10] = {
@@ -14,6 +17,21 @@ bool CarDetected[10]= {false};
 // Hàm đọc dữ liệu từ cảm biến DHT11 (nhiệt độ và độ ẩm)
 void readDHT11(void *pvParameters)
 {
+  const DeviceConfig* config = getCurrentConfig();
+  
+  if (!config->enableTempHumidity) {
+    Serial.println("DHT11 disabled for this device type");
+    vTaskDelete(NULL);
+    return;
+  }
+
+  // Initialize DHT sensor with dynamic pin
+  if (dht == nullptr) {
+    dht = new DHT(getDHTPin(), DHTTYPE);
+    dht->begin();
+    Serial.printf("DHT11 initialized on pin %d for %s\n", getDHTPin(), config->deviceType);
+  }
+
   unsigned long lastReadTime = 0;
 
   while (1)
@@ -22,8 +40,8 @@ void readDHT11(void *pvParameters)
     {
       lastReadTime = millis();
 
-      float temp = dht.readTemperature();
-      float hum = dht.readHumidity();
+      float temp = dht->readTemperature();
+      float hum = dht->readHumidity();
 
       if (!isnan(temp) && !isnan(hum))
       {
@@ -33,13 +51,14 @@ void readDHT11(void *pvParameters)
           humidity = hum;
           xSemaphoreGive(sensorDataMutex);
         }
-        Serial.printf("Nhiệt độ: %.2f °C | Độ ẩm: %.2f %%\n", temp, hum);
+        Serial.printf("[%s] Nhiệt độ: %.2f °C | Độ ẩm: %.2f %%\n", config->deviceType, temp, hum);
       }
       else
       {
         Serial.println("Lỗi! Không thể đọc từ DHT11.");
       }
-    }    vTaskDelay(pdMS_TO_TICKS(500));
+    }
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
 
@@ -110,16 +129,24 @@ String getAQICategory(int aqi)
 
 // Đọc và gửi dữ liệu chất lượng không khí từ MQ135
 void readMQ135(void *pvParameters)
-{  const DeviceConfig* config = getCurrentConfig();
+{
+  const DeviceConfig* config = getCurrentConfig();
   
   if (!config->enableAirQuality) {
     Serial.println("MQ135 disabled for this device type");
     vTaskDelete(NULL);
     return;
   }
+
+  // Initialize MQ135 sensor with dynamic pin
+  if (mq135_sensor == nullptr) {
+    mq135_sensor = new MQ135(getMQ135Pin());
+    Serial.printf("MQ135 initialized on pin %d for %s\n", getMQ135Pin(), config->deviceType);
+  }
+
   while (1)
   {
-    int rawValue = analogRead(MQ135_PIN);
+    int rawValue = analogRead(getMQ135Pin());
     int mappedValue = map(rawValue, 0, 4096, 0, 1024);
     airQuality = mappedValue;
 
@@ -140,7 +167,19 @@ void readMQ135(void *pvParameters)
 // Nhiệm vụ đếm số người dựa trên cảm biến PIR
 void ultrasonicTask(void *pvParameters)
 {
+  const DeviceConfig* config = getCurrentConfig();
+  
+  if (!config->enablePIR) {
+    Serial.println("PIR sensor disabled for this device type");
+    vTaskDelete(NULL);
+    return;
+  }
+
   int lastPirState = LOW; // Lưu trạng thái trước đó
+  int pirPin = getPIRPin(); // Get dynamic PIR pin
+  pinMode(pirPin, INPUT);
+  
+  Serial.printf("PIR initialized on pin %d for %s\n", pirPin, config->deviceType);
 
   while (1)
   {
@@ -150,11 +189,11 @@ void ultrasonicTask(void *pvParameters)
     if (pirState == HIGH && lastPirState == LOW)
     {
       peopleCount++;
-      Serial.printf("Số người hiện tại: %d\n", peopleCount);
+      Serial.printf("[%s] Số người hiện tại: %d\n", config->deviceType, peopleCount);
     }
     else if (pirState == LOW && lastPirState == HIGH)
     {
-      Serial.println("Không có người");
+      Serial.printf("[%s] Không có người\n", config->deviceType);
     }
 
     lastPirState = pirState; // Cập nhật trạng thái trước đó
@@ -172,6 +211,9 @@ void carslotTask(void *pvParameters) {
     vTaskDelete(NULL);
     return;
   }
+
+  // Initialize ultrasonic sensors with dynamic pins
+  initUltrasonicSensors();
 
   const float DETECTION_THRESHOLD = 10.0;
   vTaskDelay(pdMS_TO_TICKS(5000)); // Delay ban đầu
@@ -210,20 +252,21 @@ void pirTask(void *pvParameters) {
         return;
     }
     
-    // Khởi tạo cảm biến PIR
-    pinMode(PIR_PIN2, INPUT);
+    // Khởi tạo cảm biến PIR với pin động
+    int pir2Pin = getPIRPin2(); // Get dynamic PIR2 pin
+    pinMode(pir2Pin, INPUT);
     bool previousMotionState = false;
     unsigned long lastDetectionTime = 0;
     const unsigned long MOTION_TIMEOUT = 30000; // 30 giây timeout cho trạng thái chuyển động
     
     // Chờ cảm biến PIR ổn định (thường cần khoảng 60 giây)
-    Serial.printf("Khởi tạo cảm biến PIR cho %s...\n", config->deviceType);
+    Serial.printf("Khởi tạo cảm biến PIR trên pin %d cho %s...\n", pir2Pin, config->deviceType);
     vTaskDelay(pdMS_TO_TICKS(10000)); // Đợi 10 giây
     Serial.printf("Cảm biến PIR cho %s đã sẵn sàng\n", config->deviceType);
     
     for (;;) {
         // Đọc trạng thái cảm biến PIR
-        bool currentMotionState = digitalRead(PIR_PIN2);
+        bool currentMotionState = digitalRead(pir2Pin);
         unsigned long currentTime = millis();
         
         // Phát hiện chuyển động
@@ -294,4 +337,31 @@ void rfidTask(void *pvParameters) {
     
     vTaskDelay(pdMS_TO_TICKS(1000)); // Check every second
   }
+}
+
+// Initialize ultrasonic sensors with dynamic pins
+void initUltrasonicSensors() {
+    const DeviceConfig* config = getCurrentConfig();
+    
+    if (!config->hasUltrasonic) {
+        return;
+    }
+    
+    int trigPin = getUltrasonicTrigPin();
+    int echoPin = getUltrasonicEchoPin();
+    
+    if (trigPin < 0 || echoPin < 0) {
+        Serial.println("ERROR: Invalid ultrasonic pin configuration");
+        return;
+    }
+    
+    Serial.printf("Initializing %d ultrasonic sensors on pins TRIG=%d, ECHO=%d\n", 
+                  config->ultrasonicSlots, trigPin, echoPin);
+    
+    for (int i = 0; i < config->ultrasonicSlots; i++) {
+        // For simplicity, using the same TRIG/ECHO pins for all slots
+        // In a real implementation, you might need multiplexing or different pins
+        ultrasonicSensor[i] = new UltraSonicDistanceSensor(trigPin, echoPin);
+        Serial.printf("Slot %s sensor initialized\n", SLOT_NAMES[i]);
+    }
 }

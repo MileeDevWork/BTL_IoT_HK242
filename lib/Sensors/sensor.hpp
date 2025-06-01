@@ -14,8 +14,8 @@ extern "C" {
 //
 #define DHTTYPE DHT11
 extern DHT20 dht20;
-extern DHT dht; 
-extern MQ135 mq135_sensor;
+extern DHT* dht;  // Now a pointer for dynamic initialization
+extern MQ135* mq135_sensor;  // Now a pointer for dynamic initialization
 //biến gán để test hàm mật độ dân số
 extern bool objectDetected;
 extern bool motionDetected;
@@ -26,6 +26,7 @@ void readDHT20(void *pvParameters);
 void readDHT11(void *pvParameters);
 void readMQ135(void *pvParameters);
 String getAQICategory(int aqi);
+void initUltrasonicSensors();  // Added function declaration
 void peopleCountingTask(void *pvParameters);
 void ultrasonicTask(void *pvParameters);
 void carslotTask(void *pvParameters);

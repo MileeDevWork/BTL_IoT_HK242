@@ -18,13 +18,7 @@ extern bool objectDetected;
 extern bool motionDetected;
 extern uint32_t previousDataSend;
 
-// Chân kết nối cảm biến
-#define DHTPIN 8         // Chân DHT11
-#define MQ135_PIN 1      // Chân MQ135
-#define TRIG_ENTER 21    // Chân TRIG siêu âm
-#define ECHO_ENTER 20    // Chân ECHO siêu âm
-#define pirPin 18        // Chân PIR đầu tiên
-#define PIR_PIN2 19      // Chân PIR thứ hai
+// Pin definitions moved to config.hpp for dynamic device-specific configuration
 
 #ifdef __cplusplus
 }

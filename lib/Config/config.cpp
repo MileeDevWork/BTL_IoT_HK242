@@ -8,11 +8,25 @@ const DeviceConfig DEVICE_CONFIGS[] = {
         .deviceType = DEVICE_TYPE_BUILDING,
         .deviceName = "Building_Control_System",
         
+        // Pin configuration for Building device
+        .pins = {
+            .dhtPin = 8,           // DHT22 temperature sensor
+            .mq135Pin = 1,         // Air quality sensor  
+            .pirPin = 18,          // PIR motion sensor
+            .pirPin2 = 19,         // Second PIR sensor
+            .ultrasonicTrigPin = -1, // Not used
+            .ultrasonicEchoPin = -1, // Not used
+            .rfidSSPin = -1,       // Not used
+            .rfidRSTPin = -1,      // Not used
+            .relayPin = 21         // Lighting control relay
+        },
+        
         // Hardware features
         .hasRFID = false,
         .hasUltrasonic = false,
         .ultrasonicSlots = 0,
-          // Environmental sensors
+        
+        // Environmental sensors
         .enableTempHumidity = true,
         .enableAirQuality = true,
         .enablePIR = true,  // People counting mode
@@ -30,11 +44,25 @@ const DeviceConfig DEVICE_CONFIGS[] = {
         .deviceType = DEVICE_TYPE_CARPARK,
         .deviceName = "Carpark_Management_System",
         
+        // Pin configuration for Carpark device  
+        .pins = {
+            .dhtPin = 15,          // DHT22 temperature sensor
+            .mq135Pin = 4,         // Air quality sensor
+            .pirPin = 19,          // PIR motion sensor (security)
+            .pirPin2 = 5,          // Second PIR sensor
+            .ultrasonicTrigPin = 22, // Ultrasonic distance sensor TRIG
+            .ultrasonicEchoPin = 18, // Ultrasonic distance sensor ECHO  
+            .rfidSSPin = 16,       // RFID reader SS pin
+            .rfidRSTPin = 21,      // RFID reader RST pin
+            .relayPin = 17         // Gate control relay
+        },
+        
         // Hardware features
         .hasRFID = true,
         .hasUltrasonic = true,
         .ultrasonicSlots = 10,
-          // Environmental sensors
+        
+        // Environmental sensors
         .enableTempHumidity = true,
         .enableAirQuality = true,
         .enablePIR = true,  // Security mode
@@ -102,4 +130,83 @@ bool isFeatureEnabled(const char* feature) {
     if (strcmp(feature, "ultrasonic") == 0) return currentConfig->hasUltrasonic;
     
     return false;
+}
+
+// Get pin configuration functions
+int getDHTPin() {
+    return currentConfig ? currentConfig->pins.dhtPin : -1;
+}
+
+int getMQ135Pin() {
+    return currentConfig ? currentConfig->pins.mq135Pin : -1;
+}
+
+int getPIRPin() {
+    return currentConfig ? currentConfig->pins.pirPin : -1;
+}
+
+int getPIRPin2() {
+    return currentConfig ? currentConfig->pins.pirPin2 : -1;
+}
+
+int getUltrasonicTrigPin() {
+    return currentConfig ? currentConfig->pins.ultrasonicTrigPin : -1;
+}
+
+int getUltrasonicEchoPin() {
+    return currentConfig ? currentConfig->pins.ultrasonicEchoPin : -1;
+}
+
+int getRFIDSSPin() {
+    return currentConfig ? currentConfig->pins.rfidSSPin : -1;
+}
+
+int getRFIDRSTPin() {
+    return currentConfig ? currentConfig->pins.rfidRSTPin : -1;
+}
+
+int getRelayPin() {
+    return currentConfig ? currentConfig->pins.relayPin : -1;
+}
+
+// Pin validation function
+bool validatePinConfiguration() {
+    if (!currentConfig) return false;
+    
+    const PinConfig* pins = &currentConfig->pins;
+    
+    Serial.println("=== PIN CONFIGURATION ===");
+    Serial.printf("Device: %s\n", currentConfig->deviceType);
+    
+    if (currentConfig->enableTempHumidity && pins->dhtPin >= 0) {
+        Serial.printf("DHT Sensor: GPIO %d\n", pins->dhtPin);
+    }
+    
+    if (currentConfig->enableAirQuality && pins->mq135Pin >= 0) {
+        Serial.printf("MQ135 Sensor: GPIO %d\n", pins->mq135Pin);
+    }
+    
+    if (currentConfig->enablePIR && pins->pirPin >= 0) {
+        Serial.printf("PIR Sensor: GPIO %d\n", pins->pirPin);
+        if (pins->pirPin2 >= 0) {
+            Serial.printf("PIR Sensor 2: GPIO %d\n", pins->pirPin2);
+        }
+    }
+    
+    if (currentConfig->hasUltrasonic && pins->ultrasonicTrigPin >= 0) {
+        Serial.printf("Ultrasonic TRIG: GPIO %d\n", pins->ultrasonicTrigPin);
+        Serial.printf("Ultrasonic ECHO: GPIO %d\n", pins->ultrasonicEchoPin);
+    }
+    
+    if (currentConfig->hasRFID && pins->rfidSSPin >= 0) {
+        Serial.printf("RFID SS: GPIO %d\n", pins->rfidSSPin);
+        Serial.printf("RFID RST: GPIO %d\n", pins->rfidRSTPin);
+    }
+    
+    if (currentConfig->enableLighting && pins->relayPin >= 0) {
+        Serial.printf("Relay Control: GPIO %d\n", pins->relayPin);
+    }
+    
+    Serial.println("========================");
+    return true;
 }
