@@ -5,3 +5,4 @@ float humidity = NAN;
 SemaphoreHandle_t sensorDataMutex = NULL;
 int airQuality = 0 ;
 String category = "";
+int peopleCount = 0;
