@@ -33,6 +33,16 @@ void carslotTask(void *pvParameters);
 void pirTask(void *pvParameters);
 void rfidTask(void *pvParameters);
 
+// Parking management constants
+#define PARKING_DETECTION_THRESHOLD 10.0f
+#define PARKING_STATS_UPDATE_INTERVAL 5000
+#define PARKING_INITIAL_DELAY 5000
+
+// Parking management functions
+void updateParkingStats();
+void sendParkingDataToThingsBoard();
+void initParkingStats();
+
 ///
 #ifdef __cplusplus
 }

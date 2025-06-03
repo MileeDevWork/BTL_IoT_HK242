@@ -250,7 +250,16 @@ void peopleCountingTask(void *pvParameters)
   }
 }
 
-// Nhiệm vụ quản lý vị trí đỗ xe qua cảm biến siêu âm
+// Hàm khởi tạo thống kê bãi đỗ xe
+void initParkingStats() {
+    totalParkingSlots = 1;  // Chỉ 1 slot A1 cho mô phỏng
+    occupiedSlots = 0;
+    availableSlots = totalParkingSlots;
+    
+    Serial.printf("Parking stats initialized: %d total slots\n", totalParkingSlots);
+}
+
+// Nhiệm vụ quản lý vị trí đỗ xe qua cảm biến siêu âm (Mô phỏng với 1 slot duy nhất)
 void carslotTask(void *pvParameters) {
   const DeviceConfig* config = getCurrentConfig();
   
@@ -260,32 +269,44 @@ void carslotTask(void *pvParameters) {
     vTaskDelete(NULL);
     return;
   }
-
-  // Initialize ultrasonic sensors with dynamic pins
+  
   initUltrasonicSensors();
-
-  const float DETECTION_THRESHOLD = 10.0;
-  vTaskDelay(pdMS_TO_TICKS(5000)); // Delay ban đầu
+  initParkingStats();
+  unsigned long lastStatsUpdate = 0;
+  
+  vTaskDelay(pdMS_TO_TICKS(PARKING_INITIAL_DELAY)); // Delay ban đầu
 
   for (;;) {
-    for (int i = 0; i < config->ultrasonicSlots; i++) {
-      if (ultrasonicSensor[i] == NULL) continue;
-
-      float distance = ultrasonicSensor[i]->measureDistanceCm();
+    bool parkingStateChanged = false;
+    
+    // Chỉ xử lý slot A1 (index 0)
+    int slotIndex = 0; // slot_A1
+    
+    if (ultrasonicSensor[slotIndex] != NULL) {      float distance = ultrasonicSensor[slotIndex]->measureDistanceCm();
       if (distance >= 0) {
-        bool currentState = (distance < DETECTION_THRESHOLD);
+        bool currentState = (distance < PARKING_DETECTION_THRESHOLD);
         Serial.printf("[Slot %s] Distance: %.2f cm, Occupied: %s\n",
-                      SLOT_NAMES[i], distance, currentState ? "true" : "false");
+                      SLOT_NAMES[slotIndex], distance, currentState ? "true" : "false");
         
-        if (currentState != CarDetected[i] && tb.connected()) {
-          tb.sendTelemetryData(SLOT_NAMES[i], currentState ? "true" : "false");
-          CarDetected[i] = currentState;
-          Serial.printf("→ Sent telemetry: %s = %s\n", SLOT_NAMES[i], currentState ? "occupied" : "free");
+        // Kiểm tra thay đổi trạng thái và gửi telemetry cho slot A1
+        if (currentState != CarDetected[slotIndex] && tb.connected()) {
+          tb.sendTelemetryData(SLOT_NAMES[slotIndex], currentState ? "true" : "false");
+          CarDetected[slotIndex] = currentState;
+          parkingStateChanged = true;
+          Serial.printf("→ Sent telemetry: %s = %s\n", SLOT_NAMES[slotIndex], currentState ? "occupied" : "free");
         }
       } else {
-        Serial.printf("[Slot %s] Sensor error!\n", SLOT_NAMES[i]);
+        Serial.printf("[Slot %s] Sensor error!\n", SLOT_NAMES[slotIndex]);
       }
     }
+    
+    // Cập nhật thống kê bãi đỗ xe nếu có thay đổi hoặc đã đến thời gian cập nhật
+    if (parkingStateChanged || (millis() - lastStatsUpdate >= PARKING_STATS_UPDATE_INTERVAL)) {
+      updateParkingStats();
+      sendParkingDataToThingsBoard();
+      lastStatsUpdate = millis();
+    }
+    
     vTaskDelay(pdMS_TO_TICKS(config->ultrasonicInterval));
   }
 }
@@ -388,7 +409,7 @@ void rfidTask(void *pvParameters) {
   }
 }
 
-// Initialize ultrasonic sensors with dynamic pins
+// Initialize ultrasonic sensors with dynamic pins (Chỉ khởi tạo cho slot A1)
 void initUltrasonicSensors() {
     const DeviceConfig* config = getCurrentConfig();
     
@@ -404,13 +425,71 @@ void initUltrasonicSensors() {
         return;
     }
     
-    Serial.printf("Initializing %d ultrasonic sensors on pins TRIG=%d, ECHO=%d\n", 
-                  config->ultrasonicSlots, trigPin, echoPin);
+    Serial.printf("Initializing 1 ultrasonic sensor for slot A1 on pins TRIG=%d, ECHO=%d\n", 
+                  trigPin, echoPin);
     
-    for (int i = 0; i < config->ultrasonicSlots; i++) {
-        // For simplicity, using the same TRIG/ECHO pins for all slots
-        // In a real implementation, you might need multiplexing or different pins
-        ultrasonicSensor[i] = new UltraSonicDistanceSensor(trigPin, echoPin);
-        Serial.printf("Slot %s sensor initialized\n", SLOT_NAMES[i]);
+    // Chỉ khởi tạo sensor cho slot A1 (index 0)
+    ultrasonicSensor[0] = new UltraSonicDistanceSensor(trigPin, echoPin);
+    Serial.printf("Slot %s sensor initialized\n", SLOT_NAMES[0]);
+    
+    // Đảm bảo các slot khác là NULL
+    for (int i = 1; i < 10; i++) {
+        ultrasonicSensor[i] = nullptr;
     }
+}
+
+// Hàm cập nhật thống kê bãi đỗ xe (Chỉ tính cho slot A1)
+void updateParkingStats() {
+    const DeviceConfig* config = getCurrentConfig();
+    
+    if (!config->hasUltrasonic) {
+        return;
+    }
+    
+    // Chỉ kiểm tra slot A1 (index 0)
+    occupiedSlots = CarDetected[0] ? 1 : 0;
+    
+    // Cập nhật số slot còn trống (chỉ có 1 slot)
+    availableSlots = totalParkingSlots - occupiedSlots;
+    
+    // Tính phần trăm lấp đầy
+    float occupancyRate = (totalParkingSlots > 0) ? ((float)occupiedSlots / totalParkingSlots) * 100.0 : 0.0;
+    
+    Serial.printf("[Parking Stats] Total: %d | Occupied: %d | Available: %d | Occupancy: %.1f%% (Slot A1 only)\n", 
+                  totalParkingSlots, occupiedSlots, availableSlots, occupancyRate);
+}
+
+// Hàm gửi dữ liệu thống kê bãi đỗ xe lên ThingsBoard
+void sendParkingDataToThingsBoard() {
+    const DeviceConfig* config = getCurrentConfig();
+    
+    if (!config->hasUltrasonic || !tb.connected()) {
+        return;
+    }
+    
+    // Tính phần trăm lấp đầy
+    float occupancyRate = (totalParkingSlots > 0) ? ((float)occupiedSlots / totalParkingSlots) * 100.0 : 0.0;
+      // Xác định trạng thái bãi đỗ xe (cho 1 slot)
+    String parkingStatus;
+    if (occupancyRate >= 95.0) {
+        parkingStatus = "Full";
+    } else if (occupancyRate >= 80.0) {
+        parkingStatus = "Nearly Full";
+    } else if (occupancyRate >= 50.0) {
+        parkingStatus = "Half Full";
+    } else if (occupancyRate >= 20.0) {
+        parkingStatus = "Available";
+    } else {
+        parkingStatus = "Mostly Empty";
+    }
+    
+    // Gửi dữ liệu thống kê lên ThingsBoard
+    tb.sendTelemetryData("total_parking_slots", totalParkingSlots);
+    tb.sendTelemetryData("occupied_slots", occupiedSlots);
+    tb.sendTelemetryData("available_slots", availableSlots);
+    tb.sendTelemetryData("occupancy_rate", occupancyRate);
+    tb.sendTelemetryData("parking_status", parkingStatus.c_str());
+    
+    Serial.printf("→ Sent parking stats to ThingsBoard: %d available, %.1f%% occupied (%s) - Slot A1 only\n", 
+                  availableSlots, occupancyRate, parkingStatus.c_str());
 }

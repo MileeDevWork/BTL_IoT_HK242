@@ -18,6 +18,11 @@ extern bool objectDetected;
 extern bool motionDetected;
 extern uint32_t previousDataSend;
 
+// Parking slot management variables
+extern int totalParkingSlots;
+extern int occupiedSlots;
+extern int availableSlots;
+
 // Area constant for density calculation
 #define AREA_SQUARE_METERS 13000.0
 

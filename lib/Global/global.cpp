@@ -9,3 +9,8 @@ int peopleCount = 0;
 bool objectDetected = false;
 bool motionDetected = false;
 uint32_t previousDataSend = 0;
+
+// Parking slot management variables
+int totalParkingSlots = 0;
+int occupiedSlots = 0;
+int availableSlots = 0;
