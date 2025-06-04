@@ -11,12 +11,15 @@ void setup()
   dht.begin();
   InitWiFi();
   sensorDataMutex = xSemaphoreCreateMutex();
+  ledStateQueue = xQueueCreate(1, sizeof(bool));
   pinMode(MQ135_PIN, INPUT);
   pinMode(pirPinIn, INPUT);
-  xTaskCreate(readDHT11, "DHT20Task", 4096, NULL, 2, NULL);
+  pinMode(ledPin, OUTPUT);
+  // xTaskCreate(readDHT11, "DHT20Task", 4096, NULL, 2, NULL);
   xTaskCreate(TaskThingsBoard, "ThingsBoard_Task", 4096, NULL, 1, NULL);
-  xTaskCreate(peopleCountingTask, "peopleCountingTask", 4096, NULL, 2, NULL);
-  xTaskCreate(readMQ135, "MQ135Task", 2048, NULL, 2, NULL);
+  xTaskCreate(ledControlTask, "LED Control Task", 2048, NULL, 3, NULL); 
+  // xTaskCreate(peopleCountingTask, "peopleCountingTask", 4096, NULL, 2, NULL);
+  // xTaskCreate(readMQ135, "MQ135Task", 2048, NULL, 2, NULL);
 }
 
 void loop()

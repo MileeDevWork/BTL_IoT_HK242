@@ -5,6 +5,8 @@
 #include <ThingsBoard.h>
 #include <WiFi.hpp>
 #include <global.hpp>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,7 +26,16 @@ extern WiFiClient wifiClient;
 extern Arduino_MQTT_Client &mqttClient;  // dùng tham chiếu
 extern ThingsBoard tb;
 
+extern PubSubClient client;
+extern const char* ledStateControlKey; // Sử dụng ledState làm key
+// Biến lưu trữ trạng thái LED
+extern volatile bool ledState;
+//nhận trạng thái led từ task mqtt
+extern QueueHandle_t ledStateQueue;
+
 void TaskThingsBoard(void *pvParameters);
+void callback(char* topic, byte* payload, unsigned int length);
+void ledControlTask(void *pvParameters);
 
 #ifdef __cplusplus
 }

@@ -25,6 +25,8 @@ extern int peopleCount;
 #define pirPinOut 10 //D7
 #define AREA_SQUARE_METERS 13000.0
 
+#define ledPin 48 //chân led
+
 
 
 ///
