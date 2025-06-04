@@ -39,12 +39,10 @@ void setup()
   }
   
   if (config->enableAirQuality) {
-    // MQ135 sensor initialization moved to readMQ135 task
     xTaskCreate(readMQ135, "MQ135_Task", 2048, NULL, 1, NULL);
   }
   
   if (config->enablePIR) {
-    // PIR sensor initialization moved to pirTask
     xTaskCreate(pirTask, "PIR_Task", 2048, NULL, 1, NULL);
   }
   

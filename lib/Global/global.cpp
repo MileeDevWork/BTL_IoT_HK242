@@ -14,3 +14,4 @@ uint32_t previousDataSend = 0;
 int totalParkingSlots = 0;
 int occupiedSlots = 0;
 int availableSlots = 0;
+float currentOccupancyRate = 0.0;

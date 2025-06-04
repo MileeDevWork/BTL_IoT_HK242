@@ -22,6 +22,7 @@ extern uint32_t previousDataSend;
 extern int totalParkingSlots;
 extern int occupiedSlots;
 extern int availableSlots;
+extern float currentOccupancyRate;
 
 // Area constant for density calculation
 #define AREA_SQUARE_METERS 13000.0

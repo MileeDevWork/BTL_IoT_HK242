@@ -6,6 +6,7 @@
 DHT* dht = nullptr;
 DHT20 dht20;
 MQ135* mq135_sensor = nullptr;
+MFRC522* mfrc522 = nullptr;
 
 UltraSonicDistanceSensor* ultrasonicSensor[10];  // hoặc struct wrapper
 const char* SLOT_NAMES[10] = {
@@ -252,34 +253,30 @@ void peopleCountingTask(void *pvParameters)
 
 // Hàm khởi tạo thống kê bãi đỗ xe
 void initParkingStats() {
-    totalParkingSlots = 1;  // Chỉ 1 slot A1 cho mô phỏng
+    totalParkingSlots = 20;  
     occupiedSlots = 0;
     availableSlots = totalParkingSlots;
     
     Serial.printf("Parking stats initialized: %d total slots\n", totalParkingSlots);
 }
 
-// Nhiệm vụ quản lý vị trí đỗ xe qua cảm biến siêu âm (Mô phỏng với 1 slot duy nhất)
+//Quản lý vị trí đỗ xe qua cảm biến siêu âm (Mô phỏng 1 slot )
 void carslotTask(void *pvParameters) {
   const DeviceConfig* config = getCurrentConfig();
-  
-  // Skip if not enabled
   if (!config->hasUltrasonic) {
     Serial.println("Ultrasonic sensors disabled for this device type");
     vTaskDelete(NULL);
     return;
   }
-  
+
   initUltrasonicSensors();
   initParkingStats();
   unsigned long lastStatsUpdate = 0;
   
-  vTaskDelay(pdMS_TO_TICKS(PARKING_INITIAL_DELAY)); // Delay ban đầu
+  vTaskDelay(pdMS_TO_TICKS(PARKING_INITIAL_DELAY)); 
 
   for (;;) {
     bool parkingStateChanged = false;
-    
-    // Chỉ xử lý slot A1 (index 0)
     int slotIndex = 0; // slot_A1
     
     if (ultrasonicSensor[slotIndex] != NULL) {      float distance = ultrasonicSensor[slotIndex]->measureDistanceCm();
@@ -323,15 +320,13 @@ void pirTask(void *pvParameters) {
     }
     
     // Khởi tạo cảm biến PIR với pin động
-    int pir2Pin = getPIRPin2(); // Get dynamic PIR2 pin
+    int pir2Pin = getPIRPin2(); 
     pinMode(pir2Pin, INPUT);
     bool previousMotionState = false;
     unsigned long lastDetectionTime = 0;
-    const unsigned long MOTION_TIMEOUT = 30000; // 30 giây timeout cho trạng thái chuyển động
-    
-    // Chờ cảm biến PIR ổn định (thường cần khoảng 60 giây)
+    const unsigned long MOTION_TIMEOUT = 30000; 
     Serial.printf("Khởi tạo cảm biến PIR trên pin %d cho %s...\n", pir2Pin, config->deviceType);
-    vTaskDelay(pdMS_TO_TICKS(10000)); // Đợi 10 giây
+    vTaskDelay(pdMS_TO_TICKS(10000));
     Serial.printf("Cảm biến PIR cho %s đã sẵn sàng\n", config->deviceType);
     
     for (;;) {
@@ -346,11 +341,9 @@ void pirTask(void *pvParameters) {
             // Nếu trạng thái thay đổi từ không có chuyển động sang có chuyển động
             if (!previousMotionState) {
                 if (strcmp(config->deviceType, DEVICE_TYPE_BUILDING) == 0) {
-                    // Building mode: People counting
                     peopleCount++;
                     Serial.printf("[%s] Phát hiện người! Số người hiện tại: %d\n", config->deviceType, peopleCount);
                 } else if (strcmp(config->deviceType, DEVICE_TYPE_CARPARK) == 0) {
-                    // Carpark mode: Security detection
                     Serial.printf("[%s] Phát hiện chuyển động! (Bảo mật)\n", config->deviceType);
                 }
                 
@@ -375,8 +368,6 @@ void pirTask(void *pvParameters) {
             if (previousMotionState) {
                 Serial.printf("[%s] Không phát hiện chuyển động\n", config->deviceType);
                 motionDetected = false;
-                
-                // Gửi dữ liệu lên ThingsBoard
                 if (tb.connected()) {
                     tb.sendTelemetryData("motion", "false");
                     Serial.printf("Đã gửi thông báo không có chuyển động lên ThingsBoard %s\n", config->deviceType);
@@ -390,7 +381,35 @@ void pirTask(void *pvParameters) {
     }
 }
 
-// Nhiệm vụ đọc RFID (thô)
+// Initialize RFID sensor with dynamic pins
+void initRFIDSensor() {
+  const DeviceConfig* config = getCurrentConfig();
+  
+  if (!config->hasRFID) {
+    Serial.println("RFID not enabled for this device type");
+    return;
+  }
+
+  // Initialize RFID sensor with dynamic pins
+  if (mfrc522 == nullptr) {
+    int ssPin = getRFIDSSPin();
+    int rstPin = getRFIDRSTPin();
+    
+    if (ssPin < 0 || rstPin < 0) {
+      Serial.println("ERROR: Invalid RFID pin configuration");
+      return;
+    }
+      mfrc522 = new MFRC522(ssPin, rstPin);
+    SPI.begin(8, 6, 7);
+    mfrc522->PCD_Init();
+    
+    Serial.printf("RFID sensor initialized on SS=%d, RST=%d for %s\n", 
+                  ssPin, rstPin, config->deviceType);
+    Serial.println("Place RFID card near reader...");
+  }
+}
+
+// Nhiệm vụ đọc RFID (RFID card reading task)
 void rfidTask(void *pvParameters) {
   const DeviceConfig* config = getCurrentConfig();
   
@@ -401,11 +420,72 @@ void rfidTask(void *pvParameters) {
     return;
   }
   
+  // Initialize RFID sensor
+  initRFIDSensor();
+  
+  if (mfrc522 == nullptr) {
+    Serial.println("ERROR: Failed to initialize RFID sensor");
+    vTaskDelete(NULL);
+    return;
+  }
+  
   Serial.printf("RFID task started for %s\n", config->deviceType);
   
+  unsigned long lastCardReadTime = 0;
+  String lastCardUID = "";
+  const unsigned long CARD_READ_INTERVAL = 1000; // Minimum interval between same card reads
+  
   while (1) {
+    // Check if a new card is present
+    if (!mfrc522->PICC_IsNewCardPresent() || !mfrc522->PICC_ReadCardSerial()) {
+      vTaskDelay(pdMS_TO_TICKS(50));
+      continue;
+    }
+
+    // Read card UID
+    String cardUID = "";
+    for (byte i = 0; i < mfrc522->uid.size; i++) {
+      if (mfrc522->uid.uidByte[i] < 0x10) {
+        cardUID += "0";
+      }
+      cardUID += String(mfrc522->uid.uidByte[i], HEX);
+    }
+    cardUID.toUpperCase();
+
+    // Check if this is the same card read recently (debouncing)
+    unsigned long currentTime = millis();
+    if (cardUID == lastCardUID && (currentTime - lastCardReadTime) < CARD_READ_INTERVAL) {
+      mfrc522->PICC_HaltA();
+      vTaskDelay(pdMS_TO_TICKS(100));
+      continue;
+    }
+
+    // Update last read info
+    lastCardUID = cardUID;
+    lastCardReadTime = currentTime;
+
+    Serial.printf("RFID Card detected - UID: %s\n", cardUID.c_str());
+
+    // Send RFID data to ThingsBoard if connected
+    if (tb.connected()) {
+      tb.sendTelemetryData("rfid_card_uid", cardUID.c_str());
+      tb.sendTelemetryData("rfid_access_time", (int)(currentTime / 1000));
+      tb.sendTelemetryData("rfid_status", "card_detected");
+      
+      Serial.printf("→ Sent RFID data to ThingsBoard: UID=%s\n", cardUID.c_str());
+    } else {
+      Serial.println("ThingsBoard not connected - RFID data not sent");
+    }
+
+    if (xSemaphoreTake(sensorDataMutex, portMAX_DELAY)) {
+      // Add RFID data to global variables if needed
+      // For now, just print the data
+      xSemaphoreGive(sensorDataMutex);
+    }
+
+    mfrc522->PICC_HaltA(); // Stop communication with card
     
-    vTaskDelay(pdMS_TO_TICKS(1000)); // Check every second
+    vTaskDelay(pdMS_TO_TICKS(500)); // Wait before next read
   }
 }
 
@@ -431,8 +511,7 @@ void initUltrasonicSensors() {
     // Chỉ khởi tạo sensor cho slot A1 (index 0)
     ultrasonicSensor[0] = new UltraSonicDistanceSensor(trigPin, echoPin);
     Serial.printf("Slot %s sensor initialized\n", SLOT_NAMES[0]);
-    
-    // Đảm bảo các slot khác là NULL
+    // Khởi tạo các slot còn lại là nullptr
     for (int i = 1; i < 10; i++) {
         ultrasonicSensor[i] = nullptr;
     }
@@ -452,11 +531,11 @@ void updateParkingStats() {
     // Cập nhật số slot còn trống (chỉ có 1 slot)
     availableSlots = totalParkingSlots - occupiedSlots;
     
-    // Tính phần trăm lấp đầy
-    float occupancyRate = (totalParkingSlots > 0) ? ((float)occupiedSlots / totalParkingSlots) * 100.0 : 0.0;
+    // Tính phần trăm lấp đầy và lưu vào global variable
+    currentOccupancyRate = (totalParkingSlots > 0) ? ((float)occupiedSlots / totalParkingSlots) * 100.0 : 0.0;
     
     Serial.printf("[Parking Stats] Total: %d | Occupied: %d | Available: %d | Occupancy: %.1f%% (Slot A1 only)\n", 
-                  totalParkingSlots, occupiedSlots, availableSlots, occupancyRate);
+                  totalParkingSlots, occupiedSlots, availableSlots, currentOccupancyRate);
 }
 
 // Hàm gửi dữ liệu thống kê bãi đỗ xe lên ThingsBoard
@@ -466,18 +545,15 @@ void sendParkingDataToThingsBoard() {
     if (!config->hasUltrasonic || !tb.connected()) {
         return;
     }
-    
-    // Tính phần trăm lấp đầy
-    float occupancyRate = (totalParkingSlots > 0) ? ((float)occupiedSlots / totalParkingSlots) * 100.0 : 0.0;
-      // Xác định trạng thái bãi đỗ xe (cho 1 slot)
+
     String parkingStatus;
-    if (occupancyRate >= 95.0) {
+    if (currentOccupancyRate >= 95.0) {
         parkingStatus = "Full";
-    } else if (occupancyRate >= 80.0) {
+    } else if (currentOccupancyRate >= 80.0) {
         parkingStatus = "Nearly Full";
-    } else if (occupancyRate >= 50.0) {
+    } else if (currentOccupancyRate >= 50.0) {
         parkingStatus = "Half Full";
-    } else if (occupancyRate >= 20.0) {
+    } else if (currentOccupancyRate >= 20.0) {
         parkingStatus = "Available";
     } else {
         parkingStatus = "Mostly Empty";
@@ -487,9 +563,9 @@ void sendParkingDataToThingsBoard() {
     tb.sendTelemetryData("total_parking_slots", totalParkingSlots);
     tb.sendTelemetryData("occupied_slots", occupiedSlots);
     tb.sendTelemetryData("available_slots", availableSlots);
-    tb.sendTelemetryData("occupancy_rate", occupancyRate);
+    tb.sendTelemetryData("occupancy_rate", currentOccupancyRate);
     tb.sendTelemetryData("parking_status", parkingStatus.c_str());
     
     Serial.printf("→ Sent parking stats to ThingsBoard: %d available, %.1f%% occupied (%s) - Slot A1 only\n", 
-                  availableSlots, occupancyRate, parkingStatus.c_str());
+                  availableSlots, currentOccupancyRate, parkingStatus.c_str());
 }

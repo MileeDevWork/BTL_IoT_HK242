@@ -29,13 +29,13 @@ const DeviceConfig DEVICE_CONFIGS[] = {
         // Environmental sensors
         .enableTempHumidity = true,
         .enableAirQuality = true,
-        .enablePIR = true,  // People counting mode
+        .enablePIR = true, 
         .enableLighting = true,
         
         // Intervals
-        .envSensorInterval = 15000,  // 15 seconds
-        .pirInterval = 5000,         // 5 seconds
-        .ultrasonicInterval = 0      // Not used
+        .envSensorInterval = 15000,  
+        .pirInterval = 5000,     
+        .ultrasonicInterval = 0   
     },
     
     // Carpark device configuration
@@ -44,16 +44,16 @@ const DeviceConfig DEVICE_CONFIGS[] = {
         .deviceType = DEVICE_TYPE_CARPARK,
         .deviceName = "Carpark_Management_System",
         
-        // Pin configuration for Carpark device  
+        // Pin configuration
         .pins = {
             .dhtPin = 15,          // DHT22 temperature sensor
             .mq135Pin = 4,         // Air quality sensor
             .pirPin = 19,          // PIR motion sensor (security)
             .pirPin2 = 5,          // Second PIR sensor
-            .ultrasonicTrigPin = 22, // Ultrasonic distance sensor TRIG
+            .ultrasonicTrigPin = 21, // Ultrasonic distance sensor TRIG
             .ultrasonicEchoPin = 18, // Ultrasonic distance sensor ECHO  
-            .rfidSSPin = 16,       // RFID reader SS pin
-            .rfidRSTPin = 21,      // RFID reader RST pin
+            .rfidSSPin = 9,       // RFID reader SS pin
+            .rfidRSTPin = 10,      // RFID reader RST pin
             .relayPin = 17         // Gate control relay
         },
         
@@ -80,7 +80,7 @@ const DeviceConfig* currentConfig = nullptr;
 
 void initConfig() {
     // Deprecated - use initConfigFromDeviceId() instead
-    currentConfig = &DEVICE_CONFIGS[0]; // Default to building
+    currentConfig = &DEVICE_CONFIGS[0];
     Serial.println("WARNING: Using deprecated initConfig(). Use initConfigFromDeviceId() instead.");
 }
 
@@ -94,7 +94,7 @@ void initConfigFromDeviceId(const char* deviceId) {
         Serial.printf("Token: %s\n", currentConfig->token);
     } else {
         Serial.println("ERROR: Invalid device mode selected!");
-        currentConfig = &DEVICE_CONFIGS[0]; // Default to building
+        currentConfig = &DEVICE_CONFIGS[0];
     }
 }
 
