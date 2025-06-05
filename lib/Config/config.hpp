@@ -17,7 +17,6 @@ typedef struct {
     int ultrasonicEchoPin;
     int rfidSSPin;
     int rfidRSTPin;
-    int relayPin;
 } PinConfig;
 
 // Cấu trúc cấu hình thiết bị
@@ -36,6 +35,7 @@ typedef struct {
     
     // Environmental sensors
     bool enableTempHumidity;
+    const char* sensorType;  // "DHT11" or "DHT20"
     bool enableAirQuality;
     bool enablePIR;
     bool enableLighting;
@@ -71,7 +71,7 @@ int getUltrasonicTrigPin();
 int getUltrasonicEchoPin();
 int getRFIDSSPin();
 int getRFIDRSTPin();
-int getRelayPin();
+const char* getSensorType();
 bool validatePinConfiguration();
 
 #ifdef __cplusplus

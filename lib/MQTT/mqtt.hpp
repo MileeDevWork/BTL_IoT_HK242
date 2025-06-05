@@ -1,12 +1,12 @@
 #ifndef MQTT_HPP
 #define MQTT_HPP
 
-#include <Arduino_MQTT_Client.h>
-#include <ThingsBoard.h>
-#include <WiFi.hpp>
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
 #include <global.hpp>
 #include <config.hpp>
-
+#include <ThingsBoard.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,10 +15,16 @@ constexpr char THINGSBOARD_SERVER[] = "app.coreiot.io";
 constexpr uint16_t THINGSBOARD_PORT = 1883U;
 
 extern WiFiClient wifiClient;
-extern Arduino_MQTT_Client mqttClient;
-extern ThingsBoard tb;
+extern PubSubClient mqttClient;
+
+#define LED_PIN 48
+extern QueueHandle_t ledStateQueue;
+extern const char* ledStateControlKey;
 
 void TaskThingsBoard(void *pvParameters);
+void ledControlTask(void *pvParameters);
+void mqttCallback(char* topic, byte* payload, unsigned int length);
+bool reconnect();
 
 #ifdef __cplusplus
 }
