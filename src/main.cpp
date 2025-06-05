@@ -12,7 +12,6 @@ void setup()
 {
   Serial.begin(115200);
   Serial.println("ESP32 IoT Device Starting...");
-  
   // Check if device is provisioned
   if (!deviceManager.isDeviceProvisioned()) {
     Serial.println("Device not provisioned. Starting provisioning mode...");
@@ -35,7 +34,7 @@ void setup()
   
   pinMode(0, INPUT_PULLUP);
   if (config->enableTempHumidity) {
-    xTaskCreate(readDHT20, "DHT20_Task", 4096, NULL, 2, NULL);
+    xTaskCreate(readDHT11, "DHT20_Task", 4096, NULL, 2, NULL);
   }
   
   if (config->enableAirQuality) {
@@ -44,6 +43,7 @@ void setup()
   
   if (config->enablePIR) {
     xTaskCreate(pirTask, "PIR_Task", 2048, NULL, 1, NULL);
+    xTaskCreate(peopleCountingTask, "PeopleCounting_Task", 2048, NULL, 1, NULL);
   }
   
   if (config->hasUltrasonic) {
