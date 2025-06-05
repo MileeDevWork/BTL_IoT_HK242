@@ -1,6 +1,7 @@
 #include <sensor.hpp>
 #include <global.hpp>
 #include <config.hpp>
+#include <Wire.h>
 
 // Global sensor objects - will be initialized with dynamic pins
 DHT* dht = nullptr;
@@ -8,7 +9,7 @@ DHT20 dht20;
 MQ135* mq135_sensor = nullptr;
 MFRC522* mfrc522 = nullptr;
 
-UltraSonicDistanceSensor* ultrasonicSensor[10];  // hoặc struct wrapper
+UltraSonicDistanceSensor* ultrasonicSensor[10];
 const char* SLOT_NAMES[10] = {
   "slot_A1", "slot_A2", "slot_A3", "slot_A4", "slot_A5",
   "slot_A6", "slot_A7", "slot_A8", "slot_A9", "slot_A10"
@@ -66,7 +67,8 @@ void readDHT11(void *pvParameters)
 // Hàm đọc dữ liệu từ cảm biến DHT20 (nhiệt độ và độ ẩm)
 void readDHT20(void *pvParameters)
 {
-  unsigned long lastReadTime = 0;  const DeviceConfig* config = getCurrentConfig();
+  unsigned long lastReadTime = 0;
+  const DeviceConfig* config = getCurrentConfig();
   
   if (!config->enableTempHumidity) {
     Serial.println("DHT20 disabled for this device type");
@@ -74,29 +76,48 @@ void readDHT20(void *pvParameters)
     return;
   }
 
+  // Initialize I2C and DHT20 sensor
+  Wire.begin();
+  if (!dht20.begin()) {
+    Serial.println("Failed to initialize DHT20 sensor!");
+    vTaskDelete(NULL);
+    return;
+  }
+  Serial.printf("DHT20 initialized for %s\n", config->deviceType);
+  
+  // Wait for sensor to stabilize
+  vTaskDelay(pdMS_TO_TICKS(2000));
+
   while (1)
   {
     if (millis() - lastReadTime >= config->envSensorInterval)
     {
       lastReadTime = millis();
 
-      dht20.read();
-      float temp = dht20.getTemperature();
-      float hum = dht20.getHumidity();
+      // Check if sensor is ready before reading
+      if (dht20.isConnected()) {
+        dht20.read();
+        float temp = dht20.getTemperature();
+        float hum = dht20.getHumidity();
 
-      if (!isnan(temp) && !isnan(hum))
-      {
-        if (xSemaphoreTake(sensorDataMutex, portMAX_DELAY))
+        if (!isnan(temp) && !isnan(hum))
         {
-          temperature = temp;
-          humidity = hum;
-          xSemaphoreGive(sensorDataMutex);
+          if (xSemaphoreTake(sensorDataMutex, portMAX_DELAY))
+          {
+            temperature = temp;
+            humidity = hum;
+            xSemaphoreGive(sensorDataMutex);
+          }
+          Serial.printf("[%s] Nhiệt độ: %.2f °C | Độ ẩm: %.2f %%\n", config->deviceType, temp, hum);
         }
-        Serial.printf("[%s] Nhiệt độ: %.2f °C | Độ ẩm: %.2f %%\n", config->deviceType, temp, hum);
-      }
-      else
-      {
-        Serial.println("Lỗi! Không thể đọc từ DHT20.");
+        else
+        {
+          Serial.println("Lỗi! Không thể đọc từ DHT20.");
+        }
+      } else {
+        Serial.println("DHT20 sensor disconnected, skipping read...");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+        continue;
       }
     }
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -253,7 +274,7 @@ void peopleCountingTask(void *pvParameters)
 
 // Hàm khởi tạo thống kê bãi đỗ xe
 void initParkingStats() {
-    totalParkingSlots = 20;  
+    totalParkingSlots = 20;   
     occupiedSlots = 0;
     availableSlots = totalParkingSlots;
     
@@ -274,13 +295,15 @@ void carslotTask(void *pvParameters) {
   unsigned long lastStatsUpdate = 0;
   
   vTaskDelay(pdMS_TO_TICKS(PARKING_INITIAL_DELAY)); 
-
   for (;;) {
     bool parkingStateChanged = false;
     int slotIndex = 0; // slot_A1
     
-    if (ultrasonicSensor[slotIndex] != NULL) {      float distance = ultrasonicSensor[slotIndex]->measureDistanceCm();
-      if (distance >= 0) {
+    if (ultrasonicSensor[slotIndex] != NULL) {
+      float distance = ultrasonicSensor[slotIndex]->measureDistanceCm();
+      
+      // HCSR04 library returns negative values for errors
+      if (distance > 0 && distance < 400) {  // Valid range for HC-SR04: 2-400cm
         bool currentState = (distance < PARKING_DETECTION_THRESHOLD);
         Serial.printf("[Slot %s] Distance: %.2f cm, Occupied: %s\n",
                       SLOT_NAMES[slotIndex], distance, currentState ? "true" : "false");
@@ -293,10 +316,16 @@ void carslotTask(void *pvParameters) {
           Serial.printf("→ Sent telemetry: %s = %s\n", SLOT_NAMES[slotIndex], currentState ? "occupied" : "free");
         }
       } else {
-        Serial.printf("[Slot %s] Sensor error!\n", SLOT_NAMES[slotIndex]);
+        // Handle sensor errors more gracefully
+        Serial.printf("[Slot %s] Sensor reading error - distance: %.2f cm (out of valid range 2-400cm)\n", 
+                      SLOT_NAMES[slotIndex], distance);
+        if (distance < 0) {
+          Serial.printf("[Slot %s] HC-SR04 timeout or connection issue\n", SLOT_NAMES[slotIndex]);
+        }
       }
-    }
-    
+    } else {
+      Serial.printf("[Slot %s] Sensor not initialized!\n", SLOT_NAMES[slotIndex]);
+    }    
     // Cập nhật thống kê bãi đỗ xe nếu có thay đổi hoặc đã đến thời gian cập nhật
     if (parkingStateChanged || (millis() - lastStatsUpdate >= PARKING_STATS_UPDATE_INTERVAL)) {
       updateParkingStats();
@@ -304,7 +333,9 @@ void carslotTask(void *pvParameters) {
       lastStatsUpdate = millis();
     }
     
-    vTaskDelay(pdMS_TO_TICKS(config->ultrasonicInterval));
+    // Ensure minimum delay to prevent sensor overload
+    int delayTime = config->ultrasonicInterval > 0 ? config->ultrasonicInterval : 2000;
+    vTaskDelay(pdMS_TO_TICKS(delayTime));
   }
 }
 
@@ -318,13 +349,15 @@ void pirTask(void *pvParameters) {
         vTaskDelete(NULL);
         return;
     }
-    
-    // Khởi tạo cảm biến PIR với pin động
+      // Khởi tạo cảm biến PIR với pin động
     int pir2Pin = getPIRPin2(); 
     pinMode(pir2Pin, INPUT);
     bool previousMotionState = false;
     unsigned long lastDetectionTime = 0;
+    unsigned long continuousMotionStartTime = 0;
+    bool continuousMotionReported = false;
     const unsigned long MOTION_TIMEOUT = 30000; 
+    const unsigned long CONTINUOUS_MOTION_THRESHOLD = 300000; // 5 phút = 300,000ms
     Serial.printf("Khởi tạo cảm biến PIR trên pin %d cho %s...\n", pir2Pin, config->deviceType);
     vTaskDelay(pdMS_TO_TICKS(10000));
     Serial.printf("Cảm biến PIR cho %s đã sẵn sàng\n", config->deviceType);
@@ -332,38 +365,38 @@ void pirTask(void *pvParameters) {
     for (;;) {
         // Đọc trạng thái cảm biến PIR
         bool currentMotionState = digitalRead(pir2Pin);
-        unsigned long currentTime = millis();
-        
-        // Phát hiện chuyển động
+        unsigned long currentTime = millis();        // Phát hiện chuyển động
         if (currentMotionState == HIGH) {
             lastDetectionTime = currentTime;
             
-            // Nếu trạng thái thay đổi từ không có chuyển động sang có chuyển động
-            if (!previousMotionState) {
-                if (strcmp(config->deviceType, DEVICE_TYPE_BUILDING) == 0) {
-                    peopleCount++;
-                    Serial.printf("[%s] Phát hiện người! Số người hiện tại: %d\n", config->deviceType, peopleCount);
-                } else if (strcmp(config->deviceType, DEVICE_TYPE_CARPARK) == 0) {
-                    Serial.printf("[%s] Phát hiện chuyển động! (Bảo mật)\n", config->deviceType);
-                }
-                
-                motionDetected = true;
-                
-                // Gửi dữ liệu lên ThingsBoard
-                if (tb.connected()) {
-                    if (strcmp(config->deviceType, DEVICE_TYPE_BUILDING) == 0) {
-                        tb.sendTelemetryData("people_count", peopleCount);
-                        tb.sendTelemetryData("motion", "true");
-                    } else {
-                        tb.sendTelemetryData("motion", "true");
-                    }
-                    Serial.printf("Đã gửi thông báo chuyển động lên ThingsBoard %s\n", config->deviceType);
-                }
+            // Nếu chưa bắt đầu đếm thời gian chuyển động liên tục
+            if (continuousMotionStartTime == 0) {
+                continuousMotionStartTime = currentTime;
+                Serial.printf("[%s] Bắt đầu phát hiện chuyển động liên tục...\n", config->deviceType);
             }
+              // Kiểm tra nếu đã có chuyển động liên tục trong 5 phút
+            if (!continuousMotionReported && 
+                (currentTime - continuousMotionStartTime >= CONTINUOUS_MOTION_THRESHOLD)) {
+                
+                Serial.printf("[%s] Phát hiện chuyển động liên tục trong 5 phút!\n", config->deviceType);
+                motionDetected = true;
+                continuousMotionReported = true;
+                
+                // Data will be sent by MQTT task - no direct ThingsBoard calls
+                Serial.printf("Chuyển động liên tục đã được ghi nhận - MQTT task sẽ gửi dữ liệu\n");
+            }
+            
             previousMotionState = true;
-        } 
-        // Không có chuyển động hoặc hết thời gian timeout
+        }        // Không có chuyển động hoặc hết thời gian timeout
         else if (currentMotionState == LOW || (currentTime - lastDetectionTime > MOTION_TIMEOUT)) {
+            // Reset thời gian bắt đầu chuyển động liên tục
+            if (continuousMotionStartTime != 0) {
+                Serial.printf("[%s] Kết thúc chu kỳ chuyển động (thời gian: %lu giây)\n", 
+                             config->deviceType, (currentTime - continuousMotionStartTime) / 1000);
+                continuousMotionStartTime = 0;
+                continuousMotionReported = false;
+            }
+            
             // Nếu trạng thái thay đổi từ có chuyển động sang không có chuyển động
             if (previousMotionState) {
                 Serial.printf("[%s] Không phát hiện chuyển động\n", config->deviceType);
@@ -433,7 +466,7 @@ void rfidTask(void *pvParameters) {
   
   unsigned long lastCardReadTime = 0;
   String lastCardUID = "";
-  const unsigned long CARD_READ_INTERVAL = 1000; // Minimum interval between same card reads
+  const unsigned long CARD_READ_INTERVAL = 1000; 
   
   while (1) {
     // Check if a new card is present
@@ -477,15 +510,9 @@ void rfidTask(void *pvParameters) {
       Serial.println("ThingsBoard not connected - RFID data not sent");
     }
 
-    if (xSemaphoreTake(sensorDataMutex, portMAX_DELAY)) {
-      // Add RFID data to global variables if needed
-      // For now, just print the data
-      xSemaphoreGive(sensorDataMutex);
-    }
-
-    mfrc522->PICC_HaltA(); // Stop communication with card
+    mfrc522->PICC_HaltA(); 
     
-    vTaskDelay(pdMS_TO_TICKS(500)); // Wait before next read
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
 
@@ -505,19 +532,44 @@ void initUltrasonicSensors() {
         return;
     }
     
-    Serial.printf("Initializing 1 ultrasonic sensor for slot A1 on pins TRIG=%d, ECHO=%d\n", 
+    Serial.printf("Initializing 1 ultrasonic sensor on pins TRIG=%d, ECHO=%d\n", 
                   trigPin, echoPin);
     
-    // Chỉ khởi tạo sensor cho slot A1 (index 0)
+    // Ensure pins are properly set up
+    pinMode(trigPin, OUTPUT);
+    pinMode(echoPin, INPUT);
+    
+    // Initialize the sensor for slot A1 (index 0)
     ultrasonicSensor[0] = new UltraSonicDistanceSensor(trigPin, echoPin);
-    Serial.printf("Slot %s sensor initialized\n", SLOT_NAMES[0]);
-    // Khởi tạo các slot còn lại là nullptr
+    
+    // Test the sensor with a few readings to ensure it's working
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Wait for sensor to stabilize
+    
+    bool sensorWorking = false;
+    for (int i = 0; i < 3; i++) {
+        float testDistance = ultrasonicSensor[0]->measureDistanceCm();
+        if (testDistance > 0 && testDistance < 400) {
+            sensorWorking = true;
+            Serial.printf("Slot %s sensor test reading: %.2f cm - OK\n", SLOT_NAMES[0], testDistance);
+            break;
+        }
+        Serial.printf("Slot %s sensor test reading %d: %.2f cm - Failed\n", SLOT_NAMES[0], i+1, testDistance);
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
+    
+    if (sensorWorking) {
+        Serial.printf("Slot %s sensor initialized successfully\n", SLOT_NAMES[0]);
+    } else {
+        Serial.printf("WARNING: Slot %s sensor may not be working properly\n", SLOT_NAMES[0]);
+    }
+    
+    // Initialize other slots as nullptr
     for (int i = 1; i < 10; i++) {
         ultrasonicSensor[i] = nullptr;
     }
 }
 
-// Hàm cập nhật thống kê bãi đỗ xe (Chỉ tính cho slot A1)
+// Hàm cập nhật thống kê bãi đỗ xe
 void updateParkingStats() {
     const DeviceConfig* config = getCurrentConfig();
     
@@ -534,7 +586,7 @@ void updateParkingStats() {
     // Tính phần trăm lấp đầy và lưu vào global variable
     currentOccupancyRate = (totalParkingSlots > 0) ? ((float)occupiedSlots / totalParkingSlots) * 100.0 : 0.0;
     
-    Serial.printf("[Parking Stats] Total: %d | Occupied: %d | Available: %d | Occupancy: %.1f%% (Slot A1 only)\n", 
+    Serial.printf("[Parking Stats] Total: %d | Occupied: %d | Available: %d | Occupancy: %.1f%%\n", 
                   totalParkingSlots, occupiedSlots, availableSlots, currentOccupancyRate);
 }
 

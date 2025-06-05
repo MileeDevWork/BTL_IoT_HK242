@@ -1,7 +1,7 @@
 #include <wifi.hpp>
 
-constexpr char WIFI_SSID[] = "ACLAB";
-constexpr char WIFI_PASSWORD[] = "ACLAB2023";
+constexpr char WIFI_SSID[] = "Min";
+constexpr char WIFI_PASSWORD[] = "23230903";
 
 // HÀM KẾT NỐI WIFI
 void InitWiFi()
@@ -24,8 +24,8 @@ bool reconnect()
 {
   if (WiFi.status() != WL_CONNECTED)
   {
-    return true;
+    InitWiFi();
+    return WiFi.status() == WL_CONNECTED;
   }
-  InitWiFi();
   return true;
 }

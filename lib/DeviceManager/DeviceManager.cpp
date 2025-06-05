@@ -154,23 +154,23 @@ void DeviceManager::startProvisioningMode() {
         profile.isProvisioned = true;
         
         saveDeviceProfile(profile);
-        
-        server->send(200, "text/html", 
+          server->send(200, "text/html", 
             "<h2>Configuration Saved!</h2>"
             "<p>Device will restart in 3 seconds...</p>"
             "<script>setTimeout(function(){ window.close(); }, 3000);</script>");
         
         // Restart after 3 seconds
         delay(3000);
+        Serial.println("Restarting device after configuration save...");
         ESP.restart();
     });
-    
-    server->on("/reset", [this]() {
+      server->on("/reset", [this]() {
         factoryReset();
         server->send(200, "text/html", 
             "<h2>Factory Reset Complete!</h2>"
             "<p>Device will restart in 3 seconds...</p>");
         delay(3000);
+        Serial.println("Restarting device after factory reset...");
         ESP.restart();
     });
     

@@ -11,6 +11,7 @@
 void setup()
 {
   Serial.begin(115200);
+  delay(5000);
   Serial.println("ESP32 IoT Device Starting...");
   
   // Check if device is provisioned
@@ -28,14 +29,21 @@ void setup()
   // Get device profile and initialize configuration
   DeviceProfile profile = deviceManager.getDeviceProfile();
   initConfigFromDeviceId(profile.deviceId);  const DeviceConfig* config = getCurrentConfig();
-  
-  Serial.printf("Starting %s with Device ID: %s\n", config->deviceName, profile.deviceId);
-    InitWiFi();
+    Serial.printf("Starting %s with Device ID: %s\n", config->deviceName, profile.deviceId);
+  InitWiFi();
   sensorDataMutex = xSemaphoreCreateMutex();
-  
-  pinMode(0, INPUT_PULLUP);
   if (config->enableTempHumidity) {
-    xTaskCreate(readDHT20, "DHT20_Task", 4096, NULL, 2, NULL);
+    const char* sensorType = getSensorType();
+    if (strcmp(sensorType, "DHT11") == 0) {
+      xTaskCreate(readDHT11, "DHT11_Task", 4096, NULL, 2, NULL);
+      Serial.printf("Created DHT11 task for %s device\n", config->deviceType);
+    } else if (strcmp(sensorType, "DHT20") == 0) {
+      xTaskCreate(readDHT20, "DHT20_Task", 4096, NULL, 2, NULL);  
+      Serial.printf("Created DHT20 task for %s device\n", config->deviceType);
+    } else {
+      Serial.printf("Unknown sensor type: %s, defaulting to DHT11\n", sensorType);
+      xTaskCreate(readDHT11, "DHT11_Task", 4096, NULL, 2, NULL);
+    }
   }
   
   if (config->enableAirQuality) {
@@ -63,40 +71,5 @@ void setup()
 // Vòng lặp chính - kiểm tra lệnh reset
 void loop()
 {
-  // Check for factory reset command via Serial
-  if (Serial.available()) {
-    String command = Serial.readString();
-    command.trim();
-    
-    if (command.equalsIgnoreCase("FACTORY_RESET") || command.equalsIgnoreCase("RESET")) {
-      Serial.println("Factory reset initiated via Serial command...");
-      deviceManager.factoryReset();
-      delay(1000);
-      ESP.restart();
-    }
-  }
-  
-  // Check for hardware factory reset button (GPIO 0 pressed for 5 seconds)
-  static unsigned long buttonPressStart = 0;
-  static bool buttonPressed = false;
-  
-  if (digitalRead(0) == LOW) { // Button pressed (active LOW)
-    if (!buttonPressed) {
-      buttonPressed = true;
-      buttonPressStart = millis();
-      Serial.println("Reset button pressed...");
-    } else if (millis() - buttonPressStart > 5000) { // Held for 5 seconds
-      Serial.println("Factory reset initiated via button...");
-      deviceManager.factoryReset();
-      delay(1000);
-      ESP.restart();
-    }
-  } else {
-    if (buttonPressed && millis() - buttonPressStart < 5000) {
-      Serial.println("Reset button released (too early)");
-    }
-    buttonPressed = false;
-  }
-  
-  delay(100);
+
 }

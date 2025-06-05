@@ -10,24 +10,23 @@ const DeviceConfig DEVICE_CONFIGS[] = {
         
         // Pin configuration for Building device
         .pins = {
-            .dhtPin = 8,           // DHT22 temperature sensor
-            .mq135Pin = 1,         // Air quality sensor  
-            .pirPin = 18,          // PIR motion sensor
-            .pirPin2 = 19,         // Second PIR sensor
-            .ultrasonicTrigPin = -1, // Not used
-            .ultrasonicEchoPin = -1, // Not used
-            .rfidSSPin = -1,       // Not used
-            .rfidRSTPin = -1,      // Not used
-            .relayPin = 21         // Lighting control relay
+            .dhtPin = 8,        
+            .mq135Pin = 1,        
+            .pirPin = 18,        
+            .pirPin2 = 10,         
+            .ultrasonicTrigPin = -1, 
+            .ultrasonicEchoPin = -1, 
+            .rfidSSPin = -1,     
+            .rfidRSTPin = -1,          
         },
         
         // Hardware features
         .hasRFID = false,
         .hasUltrasonic = false,
         .ultrasonicSlots = 0,
-        
-        // Environmental sensors
+          // Environmental sensors
         .enableTempHumidity = true,
+        .sensorType = "DHT11",
         .enableAirQuality = true,
         .enablePIR = true, 
         .enableLighting = true,
@@ -46,27 +45,25 @@ const DeviceConfig DEVICE_CONFIGS[] = {
         
         // Pin configuration
         .pins = {
-            .dhtPin = 15,          // DHT22 temperature sensor
-            .mq135Pin = 4,         // Air quality sensor
+            .dhtPin = 8,          //temperature sensor
+            .mq135Pin = -1,         // Air quality sensor
             .pirPin = 19,          // PIR motion sensor (security)
             .pirPin2 = 5,          // Second PIR sensor
-            .ultrasonicTrigPin = 21, // Ultrasonic distance sensor TRIG
-            .ultrasonicEchoPin = 18, // Ultrasonic distance sensor ECHO  
+            .ultrasonicTrigPin = 2, // Ultrasonic distance sensor TRIG
+            .ultrasonicEchoPin = 3, // Ultrasonic distance sensor ECHO  
             .rfidSSPin = 9,       // RFID reader SS pin
             .rfidRSTPin = 10,      // RFID reader RST pin
-            .relayPin = 17         // Gate control relay
         },
         
         // Hardware features
         .hasRFID = true,
         .hasUltrasonic = true,
-        .ultrasonicSlots = 10,
-        
-        // Environmental sensors
+        .ultrasonicSlots = 10,        // Environmental sensors
         .enableTempHumidity = true,
-        .enableAirQuality = true,
+        .sensorType = "DHT11",
+        .enableAirQuality = false,
         .enablePIR = true,  // Security mode
-        .enableLighting = true,
+        .enableLighting = false,
         
         // Intervals
         .envSensorInterval = 30000,  // 30 seconds (less frequent for parking)
@@ -165,8 +162,9 @@ int getRFIDRSTPin() {
     return currentConfig ? currentConfig->pins.rfidRSTPin : -1;
 }
 
-int getRelayPin() {
-    return currentConfig ? currentConfig->pins.relayPin : -1;
+
+const char* getSensorType() {
+    return currentConfig ? currentConfig->sensorType : "DHT11";
 }
 
 // Pin validation function
@@ -201,10 +199,6 @@ bool validatePinConfiguration() {
     if (currentConfig->hasRFID && pins->rfidSSPin >= 0) {
         Serial.printf("RFID SS: GPIO %d\n", pins->rfidSSPin);
         Serial.printf("RFID RST: GPIO %d\n", pins->rfidRSTPin);
-    }
-    
-    if (currentConfig->enableLighting && pins->relayPin >= 0) {
-        Serial.printf("Relay Control: GPIO %d\n", pins->relayPin);
     }
     
     Serial.println("========================");

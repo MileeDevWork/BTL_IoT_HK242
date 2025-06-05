@@ -305,6 +305,6 @@
   "C_Cpp_Runner.showCompilationTime": false,
   "C_Cpp_Runner.useLinkTimeOptimization": false,
   "C_Cpp_Runner.msvcSecureNoWarnings": false,
-  "idf.portWin": "COM7",
+  "idf.portWin": "COM3",
   "cmake.sourceDirectory": "C:/Users/Dell/Desktop/Study/Allproject/BTL_IOT/Merge/BTL_IoT_HK242/lib/ArduinoJson/src"
 }
