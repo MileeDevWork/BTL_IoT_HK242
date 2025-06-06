@@ -789,6 +789,7 @@ String getDensityLevel(float density) {
 
 // Nhiệm vụ đếm số người dựa trên cảm biến PIR
 void peopleCountingTask(void *pvParameters) {
+    Serial.println("peopleCountingTask started!");//debug
     const DeviceConfig* config = getCurrentConfig();
 
     if (!config->enablePIR) {
@@ -804,6 +805,8 @@ void peopleCountingTask(void *pvParameters) {
 
     int pirPinIn = getPIRPin();
     int pirPinOut = getPIRPin2();
+
+    Serial.printf("PIR pins configured: IN=%d, OUT=%d\n", pirPinIn, pirPinOut);//debug
 
     if (pirPinIn < 0 || pirPinOut < 0) {
         Serial.println("ERROR: Invalid PIR pin configuration");

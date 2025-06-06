@@ -27,7 +27,8 @@ extern float currentOccupancyRate;
 // Area constant for density calculation
 #define AREA_SQUARE_METERS 13000.0
 
-
+#define NUM_PIXELS 4
+#define PIN_NEO_PIXEL 6   // D3
 
 ///
 #ifdef __cplusplus

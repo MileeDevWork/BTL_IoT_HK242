@@ -48,7 +48,7 @@ void setup()
   
   if (config->enablePIR) {
     xTaskCreate(pirTask, "PIR_Task", 2048, NULL, 1, NULL);
-    xTaskCreate(peopleCountingTask, "PeopleCounting_Task", 2048, NULL, 1, NULL);
+    xTaskCreate(peopleCountingTask, "PeopleCounting_Task", 4096, NULL, 1, NULL);
   }
   
   if (config->hasUltrasonic) {

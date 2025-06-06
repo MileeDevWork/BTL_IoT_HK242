@@ -30,15 +30,33 @@ const char* ledStateControlKey = "ledState"; // Key của shared attribute
 // }
 
 // Hàm điều khiển LED
+// void ledControlTask(void *pvParameters) {
+//     bool currentLedState = false;
+//     pinMode(LED_PIN, OUTPUT); // Đảm bảo LED_PIN được cấu hình
+//     digitalWrite(LED_PIN, LOW); // Đặt trạng thái ban đầu
+//     Serial.println("LED Control Task started");
+//     for (;;) {
+//         if (xQueueReceive(ledStateQueue, &currentLedState, portMAX_DELAY) == pdTRUE) {
+//             digitalWrite(LED_PIN, currentLedState ? HIGH : LOW);
+//             Serial.printf("Setting LED to: %s\n", currentLedState ? "ON" : "OFF");
+//         } else {
+//             Serial.println("Failed to receive LED state from queue");
+//         }
+//     }
+// }
 void ledControlTask(void *pvParameters) {
     bool currentLedState = false;
-    pinMode(LED_PIN, OUTPUT); // Đảm bảo LED_PIN được cấu hình
-    digitalWrite(LED_PIN, LOW); // Đặt trạng thái ban đầu
     Serial.println("LED Control Task started");
+    
     for (;;) {
         if (xQueueReceive(ledStateQueue, &currentLedState, portMAX_DELAY) == pdTRUE) {
-            digitalWrite(LED_PIN, currentLedState ? HIGH : LOW);
-            Serial.printf("Setting LED to: %s\n", currentLedState ? "ON" : "OFF");
+            if (currentLedState) {
+                ledwhite_on();
+                Serial.println("LED state changed to: ON");
+            } else {
+                ledwhite_off();
+                Serial.println("LED state changed to: OFF");
+            }
         } else {
             Serial.println("Failed to receive LED state from queue");
         }

@@ -7,6 +7,7 @@
 #include <global.hpp>
 #include <config.hpp>
 #include <ThingsBoard.h>
+#include <control.hpp>
 #ifdef __cplusplus
 extern "C" {
 #endif
