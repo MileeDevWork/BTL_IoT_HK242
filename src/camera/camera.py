@@ -16,37 +16,45 @@ import pytesseract
 from PIL import Image
 from ultralytics import YOLO
 from collections import deque
-import subprocess  # For executing ffmpeg
-# from IPython.display import display  # Import display for showing images
-import glob  # Import glob for file pattern matching
-from datetime import datetime  # For timestamp generation
-from whitelist_db import WhitelistDB  # Import database functionality
-# from run.detect.train7.weights import best  # Import the trained YOLOv8 model
-# Define dataset paths relative to script directory to create absolute paths
+import subprocess  
+import glob  
+from datetime import datetime
+
+# Fix for PyTorch 2.6+ weights_only parameter issue
+original_torch_load = torch.load
+def patched_torch_load(*args, **kwargs):
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return original_torch_load(*args, **kwargs)
+torch.load = patched_torch_load
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'Database'))
+from whitelist_db import WhitelistDB 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 train_dir = os.path.join(script_dir, "Data", "license-plate-dataset", "images", "train")
 val_dir = os.path.join(script_dir, "Data", "license-plate-dataset", "images", "val")
 
-# Define class names
-classes = ["license_plate"]  # Add more classes if needed
+classes = ["license_plate"] 
 
 pytesseract.pytesseract.tesseract_cmd = r'C:/Program Files/Tesseract-OCR/tesseract.exe'
 
-# Load the trained YOLOv8 model (assuming you have already trained it)
-model_path = "../runs/detect/train7/weights/best.pt"  # Updated path to go up one directory
-model = YOLO(model_path)
+try:
+    model_path = os.path.join(os.path.dirname(__file__), "..", "..", "runs", "detect", "train7", "weights", "best.pt")
+    if not os.path.exists(model_path):
+        # Fallback to workspace models
+        model_path = os.path.join(os.path.dirname(__file__), "..", "..", "yolov8n.pt")
+    
+    print(f"Loading YOLO model from: {model_path}")
+    model = YOLO(model_path)
+    print(" YOLO model loaded successfully!")
+except Exception as e:
+    print(f"Warning: Could not load custom model ({e})")
+    print("Loading default YOLOv8n model...")
+    model = YOLO('yolov8n.pt') 
 
 def extract_plate_text_advanced(image_source, model, confidence_threshold=0.5, save_cropped=False, save_dir=None):
     """
     Hàm trích xuất biển số xe chất lượng cao với tiền xử lý nâng cao.
-    
-    Args:
-        image_source: Có thể là đường dẫn file ảnh (str) hoặc frame ảnh (numpy array)
-        model: Trained YOLO model
-        confidence_threshold (float): Ngưỡng confidence cho detection (default: 0.5)
-        save_cropped (bool): Có lưu ảnh biển số đã crop không
-        save_dir (str): Thư mục lưu ảnh (nếu save_cropped=True)
-        
     Returns:
         dict: {
             'texts': [list of extracted texts],
@@ -69,7 +77,7 @@ def extract_plate_text_advanced(image_source, model, confidence_threshold=0.5, s
         # Đọc từ file
         frame = cv2.imread(image_source)
         if frame is None:
-            print(f"❌ Không thể đọc ảnh từ: {image_source}")
+            print(f"Không thể đọc ảnh từ: {image_source}")
             return result
     else:
         # Sử dụng frame trực tiếp
@@ -181,10 +189,10 @@ def extract_plate_text_advanced(image_source, model, confidence_threshold=0.5, s
                                 save_path = os.path.join(save_dir, filename)
                                 cv2.imwrite(save_path, cropped_plate)
                                 result['save_paths'].append(save_path)
-                                print(f"✅ Đã lưu biển số '{best_text}' tại: {save_path}")
+                                print(f"Đã lưu biển số '{best_text}' tại: {save_path}")
                         
                     except Exception as e:
-                        print(f"❌ Lỗi xử lý OCR: {e}")
+                        print(f"Lỗi xử lý OCR: {e}")
                         continue
     
     return result
@@ -452,12 +460,12 @@ class VideoCamera:
     def enable_auto_save(self):
         """Enable automatic saving of detected license plates to database"""
         self.auto_save_enabled = True
-        print("📝 Auto-save enabled for license plate detection")
+        print(" Auto-save enabled for license plate detection")
     
     def disable_auto_save(self):
         """Disable automatic saving of detected license plates to database"""
         self.auto_save_enabled = False
-        print("🚫 Auto-save disabled for license plate detection")
+        print(" Auto-save disabled for license plate detection")
     
     def is_auto_save_enabled(self):
         """Check if auto-save is currently enabled"""

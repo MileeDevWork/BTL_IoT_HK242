@@ -27,27 +27,27 @@ class RFIDMQTTServer:
         self.client.on_message = self.on_message
         self.client.on_disconnect = self.on_disconnect
         
-        logger.info("🚀 RFID MQTT Server (Vào/Ra) đã được khởi tạo")
+        logger.info("RFID MQTT Server (Vào/Ra) đã được khởi tạo")
     
     def on_connect(self, client, userdata, flags, rc):
         """Callback khi kết nối MQTT thành công"""
         if rc == 0:
-            logger.info(f"✅ Đã kết nối MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
+            logger.info(f" Đã kết nối MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
             
             # Subscribe cả 2 topic vào và ra
             client.subscribe(TOPIC_SUB_IN)
             client.subscribe(TOPIC_SUB_OUT)
-            logger.info(f"📡 Đã subscribe topics:")
+            logger.info(f" Đã subscribe topics:")
             logger.info(f"  - Vào: {TOPIC_SUB_IN}")
             logger.info(f"  - Ra: {TOPIC_SUB_OUT}")
             
             self.is_running = True
         else:
-            logger.error(f"❌ Lỗi kết nối MQTT Broker. Code: {rc}")
+            logger.error(f" Lỗi kết nối MQTT Broker. Code: {rc}")
     
     def on_disconnect(self, client, userdata, rc):
         """Callback khi mất kết nối MQTT"""
-        logger.warning(f"⚠️ Mất kết nối MQTT Broker. Code: {rc}")
+        logger.warning(f" Mất kết nối MQTT Broker. Code: {rc}")
         self.is_running = False
     
     def on_message(self, client, userdata, msg):
@@ -64,7 +64,7 @@ class RFIDMQTTServer:
         try:
             # Decode message
             message = msg.payload.decode('utf-8')
-            logger.info(f"📨 Nhận message từ {msg.topic}: {message}")
+            logger.info(f" Nhận message từ {msg.topic}: {message}")
             
             # Parse JSON
             try:
@@ -77,7 +77,7 @@ class RFIDMQTTServer:
             device_id = data.get("device_id", "UNKNOWN_DEVICE")
             
             if not uid:
-                logger.warning("⚠️ Message không chứa UID hợp lệ")
+                logger.warning(" Message không chứa UID hợp lệ")
                 return
             
             # Xác định loại quét (vào hay ra) dựa trên topic
@@ -119,7 +119,7 @@ class RFIDMQTTServer:
                 self.handle_vehicle_exit(uid, auth_result, device_id)
             
         except Exception as e:
-            logger.error(f"❌ Lỗi xử lý message: {e}")
+            logger.error(f" Lỗi xử lý message: {e}")
             
             # Gửi error response
             error_response = {
@@ -158,8 +158,8 @@ class RFIDMQTTServer:
                     "device_id": device_id
                 }
                 
-                logger.info(f"🚗➡️ Xe vào: {auth_result['name']} - {license_plate}")
-                
+                logger.info(f" Xe vào: {auth_result['name']} - {license_plate}")
+            
             else:
                 # Lỗi chụp ảnh hoặc trích xuất biển số
                 response = {
@@ -174,12 +174,12 @@ class RFIDMQTTServer:
                     "device_id": device_id
                 }
                 
-                logger.warning(f"⚠️ Lỗi xử lý xe vào {uid}: {snapshot_result['error']}")
+                logger.warning(f" Lỗi xử lý xe vào {uid}: {snapshot_result['error']}")
             
             self.send_response(response, True)
             
         except Exception as e:
-            logger.error(f"❌ Lỗi handle_vehicle_entry {uid}: {e}")
+            logger.error(f"Lỗi handle_vehicle_entry {uid}: {e}")
     
     def handle_vehicle_exit(self, uid, auth_result, device_id):
         """Xử lý xe ra khỏi bãi"""
@@ -212,12 +212,12 @@ class RFIDMQTTServer:
                 }
                 
                 if exit_result["success"] and exit_result.get("match_status") == "match":
-                    logger.info(f"🚗⬅️✅ Xe ra khớp: {auth_result['name']} - {license_plate}")
+                    logger.info(f" Xe ra khớp: {auth_result['name']} - {license_plate}")
                 elif exit_result["success"] and exit_result.get("match_status") == "mismatch":
-                    logger.warning(f"🚗⬅️❌ Xe ra KHÔNG khớp: {auth_result['name']} - {exit_result.get('entry_plate')} ≠ {license_plate}")
+                    logger.warning(f" Xe ra KHÔNG khớp: {auth_result['name']} - {exit_result.get('entry_plate')} ≠ {license_plate}")
                 else:
-                    logger.warning(f"🚗⬅️⚠️ Xe ra có vấn đề: {auth_result['name']} - {exit_result['message']}")
-                
+                    logger.warning(f" Xe ra có vấn đề: {auth_result['name']} - {exit_result['message']}")
+            
             else:
                 # Lỗi chụp ảnh hoặc trích xuất biển số
                 response = {
@@ -232,12 +232,12 @@ class RFIDMQTTServer:
                     "device_id": device_id
                 }
                 
-                logger.warning(f"⚠️ Lỗi xử lý xe ra {uid}: {snapshot_result['error']}")
+                logger.warning(f" Lỗi xử lý xe ra {uid}: {snapshot_result['error']}")
             
             self.send_response(response, False)
             
         except Exception as e:
-            logger.error(f"❌ Lỗi handle_vehicle_exit {uid}: {e}")
+            logger.error(f" Lỗi handle_vehicle_exit {uid}: {e}")
     
     def capture_and_extract_plate(self, uid, scan_type):
         """
@@ -254,7 +254,7 @@ class RFIDMQTTServer:
             # URL chụp ảnh với flag để trích xuất biển số
             snapshot_url = f"http://{FLASK_HOST}:{FLASK_PORT}/snapshot?flag=1&crop=1&extract_plate=1"
             
-            logger.info(f"📸 Đang chụp ảnh {scan_type} cho UID: {uid}")
+            logger.info(f" Đang chụp ảnh {scan_type} cho UID: {uid}")
             
             # Gửi request chụp ảnh
             response = requests.get(snapshot_url, timeout=15)
@@ -269,53 +269,53 @@ class RFIDMQTTServer:
                         image_path = camera_result.get("image_path", "")
                         
                         if license_plate:
-                            logger.info(f"✅ Đã trích xuất biển số {scan_type}: {license_plate}")
+                            logger.info(f" Đã trích xuất biển số {scan_type}: {license_plate}")
                             return {
                                 "success": True,
                                 "license_plate": license_plate,
                                 "image_path": image_path
                             }
                         else:
-                            logger.warning(f"⚠️ Không trích xuất được biển số từ ảnh {scan_type}")
+                            logger.warning(f" Không trích xuất được biển số từ ảnh {scan_type}")
                             return {
                                 "success": False,
                                 "error": "Không trích xuất được biển số từ ảnh"
                             }
                     else:
                         error_msg = camera_result.get("error", "Lỗi không xác định từ camera")
-                        logger.warning(f"⚠️ Camera trả về lỗi {scan_type}: {error_msg}")
+                        logger.warning(f" Camera trả về lỗi {scan_type}: {error_msg}")
                         return {
                             "success": False,
                             "error": error_msg
                         }
                         
                 except json.JSONDecodeError:
-                    logger.warning(f"⚠️ Camera response không phải JSON {scan_type}")
+                    logger.warning(f" Camera response không phải JSON {scan_type}")
                     return {
                         "success": False,
                         "error": "Camera response không đúng định dạng"
                     }
             else:
-                logger.warning(f"⚠️ Lỗi chụp ảnh {scan_type}: HTTP {response.status_code}")
+                logger.warning(f" Lỗi chụp ảnh {scan_type}: HTTP {response.status_code}")
                 return {
                     "success": False,
                     "error": f"HTTP {response.status_code}"
                 }
                 
         except requests.exceptions.Timeout:
-            logger.warning(f"⚠️ Timeout chụp ảnh {scan_type}")
+            logger.warning(f"Timeout chụp ảnh {scan_type}")
             return {
                 "success": False,
                 "error": "Timeout kết nối camera"
             }
         except requests.exceptions.RequestException as e:
-            logger.warning(f"⚠️ Không thể kết nối camera {scan_type}: {e}")
+            logger.warning(f" Không thể kết nối camera {scan_type}: {e}")
             return {
                 "success": False,
                 "error": f"Không thể kết nối camera: {str(e)}"
             }
         except Exception as e:
-            logger.error(f"❌ Lỗi capture_and_extract_plate {scan_type}: {e}")
+            logger.error(f" Lỗi capture_and_extract_plate {scan_type}: {e}")
             return {
                 "success": False,
                 "error": f"Lỗi hệ thống: {str(e)}"
@@ -335,19 +335,19 @@ class RFIDMQTTServer:
             self.client.publish("yolouno/rfid/response", response_json)
             
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                status = "✅ Cho phép" if response_data.get("allowed") else "❌ Từ chối"
+                status = " Cho phép" if response_data.get("allowed") else "❌ Từ chối"
                 scan_type = response_data.get("scan_type", "unknown")
-                logger.info(f"📤 Đã gửi response {scan_type}: {status} - UID: {response_data.get('uid')}")
+                logger.info(f" Đã gửi response {scan_type}: {status} - UID: {response_data.get('uid')}")
             else:
-                logger.error(f"❌ Lỗi gửi response. Code: {result.rc}")
+                logger.error(f" Lỗi gửi response. Code: {result.rc}")
                 
         except Exception as e:
-            logger.error(f"❌ Lỗi gửi response: {e}")
+            logger.error(f" Lỗi gửi response: {e}")
     
     def start(self):
         """Khởi động MQTT Server"""
         try:
-            logger.info(f"🔄 Đang kết nối tới MQTT Broker...")
+            logger.info(f" Đang kết nối tới MQTT Broker...")
             
             # Kết nối MQTT Broker
             self.client.connect(MQTT_BROKER, MQTT_PORT, 60)
@@ -355,45 +355,39 @@ class RFIDMQTTServer:
             # Bắt đầu loop
             self.client.loop_start()
             
-            logger.info("🚀 RFID MQTT Server (Vào/Ra) đã khởi động!")
-            logger.info(f"📡 Subscribe topics:")
-            logger.info(f"  - Vào: {TOPIC_SUB_IN}")
-            logger.info(f"  - Ra: {TOPIC_SUB_OUT}")
-            logger.info(f"📤 Publish topics:")
-            logger.info(f"  - Vào: {TOPIC_PUB_IN}")
-            logger.info(f"  - Ra: {TOPIC_PUB_OUT}")
-            logger.info(f"📸 Camera URL: http://{FLASK_HOST}:{FLASK_PORT}")
+            logger.info(" RFID MQTT Server (Vào/Ra) đã khởi động!")
+            logger.info(f" Camera URL: http://{FLASK_HOST}:{FLASK_PORT}")
             
             # Keep running
             while True:
                 if not self.is_running:
-                    logger.warning("⚠️ MQTT connection lost. Attempting to reconnect...")
+                    logger.warning(" MQTT connection lost. Attempting to reconnect...")
                     time.sleep(5)
                     try:
                         self.client.reconnect()
                     except Exception as e:
-                        logger.error(f"❌ Reconnect failed: {e}")
+                        logger.error(f" Reconnect failed: {e}")
                 
                 time.sleep(1)
                 
         except KeyboardInterrupt:
-            logger.info("🛑 Đang dừng server...")
+            logger.info(" Đang dừng server...")
             self.stop()
         except Exception as e:
-            logger.error(f"❌ Lỗi khởi động server: {e}")
+            logger.error(f" Lỗi khởi động server: {e}")
     
     def stop(self):
         """Dừng MQTT Server"""
         try:
             self.client.loop_stop()
             self.client.disconnect()
-            logger.info("✅ RFID MQTT Server đã dừng")
+            logger.info(" RFID MQTT Server đã dừng")
         except Exception as e:
-            logger.error(f"❌ Lỗi dừng server: {e}")
+            logger.error(f" Lỗi dừng server: {e}")
     
     def test_uid(self, uid, scan_type="entry"):
         """Test function để kiểm tra UID"""
-        logger.info(f"🧪 Testing UID: {uid} ({scan_type})")
+        logger.info(f" Testing UID: {uid} ({scan_type})")
         
         # Tạo test message
         test_message = {
@@ -416,12 +410,12 @@ class RFIDMQTTServer:
         """Hiển thị dashboard thông tin"""
         try:
             print("\n" + "="*60)
-            print("🚗 DASHBOARD - HỆ THỐNG QUẢN LÝ XE VÀO/RA")
+            print(" DASHBOARD - HỆ THỐNG QUẢN LÝ XE VÀO/RA")
             print("="*60)
             
             # Xe đang trong bãi
             vehicles_inside = self.db.get_vehicles_in_parking()
-            print(f"\n🅿️ XE ĐANG TRONG BÃI ({len(vehicles_inside)} xe):")
+            print(f"\n XE ĐANG TRONG BÃI ({len(vehicles_inside)} xe):")
             if vehicles_inside:
                 for vehicle in vehicles_inside:
                     entry_time = vehicle["entry_time"].strftime("%H:%M %d/%m")
@@ -431,13 +425,13 @@ class RFIDMQTTServer:
             
             # Lịch sử gần đây
             recent_history = self.db.get_vehicle_history(limit=5)
-            print(f"\n📊 LỊCH SỬ GẦN ĐÂY ({len(recent_history)} record):")
+            print(f"\n LỊCH SỬ GẦN ĐÂY ({len(recent_history)} record):")
             for record in recent_history:
                 status = "Trong bãi" if record["status"] == "inside" else "Đã ra"
                 entry_time = record["entry_time"].strftime("%H:%M %d/%m")
                 if record["exit_time"]:
                     exit_time = record["exit_time"].strftime("%H:%M %d/%m")
-                    match_icon = "✅" if record.get("match_status") == "match" else "❌"
+                    match_icon = "" if record.get("match_status") == "match" else "❌"
                     print(f"  - UID: {record['uid']} | {record['license_plate']} | {entry_time} → {exit_time} {match_icon}")
                 else:
                     print(f"  - UID: {record['uid']} | {record['license_plate']} | {entry_time} | {status}")
@@ -445,7 +439,7 @@ class RFIDMQTTServer:
             # Trường hợp không khớp biển số
             mismatches = self.db.get_mismatch_reports(limit=3)
             if mismatches:
-                print(f"\n⚠️ BIỂN SỐ KHÔNG KHỚP ({len(mismatches)} trường hợp):")
+                print(f"\nBIỂN SỐ KHÔNG KHỚP ({len(mismatches)} trường hợp):")
                 for mismatch in mismatches:
                     exit_time = mismatch["exit_time"].strftime("%H:%M %d/%m")
                     print(f"  - UID: {mismatch['uid']} | Vào: {mismatch['license_plate']} | Ra: {mismatch['exit_license_plate']} | {exit_time}")
@@ -453,13 +447,13 @@ class RFIDMQTTServer:
             print("="*60)
             
         except Exception as e:
-            logger.error(f"❌ Lỗi hiển thị dashboard: {e}")
+            logger.error(f" Lỗi hiển thị dashboard: {e}")
 
 # CLI Interface cho testing
 def main():
     server = RFIDMQTTServer()
     
-    print("\n🎯 RFID MQTT Access Control System (Vào/Ra)")
+    print("\n RFID MQTT Access Control System (Vào/Ra)")
     print("="*60)
     print("1. Khởi động server")
     print("2. Test UID vào")
@@ -471,10 +465,10 @@ def main():
     
     while True:
         try:
-            choice = input("\n👉 Chọn chức năng (1-7): ").strip()
+            choice = input("\n Chọn chức năng (1-7): ").strip()
             
             if choice == "1":
-                print("\n🚀 Đang khởi động RFID MQTT Server...")
+                print("\n Đang khởi động RFID MQTT Server...")
                 server.start()
                 break
                 
@@ -493,7 +487,7 @@ def main():
                 
             elif choice == "5":
                 cards = server.db.get_all_cards()
-                print(f"\n📋 Danh sách thẻ ({len(cards)} thẻ):")
+                print(f"\n Danh sách thẻ ({len(cards)} thẻ):")
                 for card in cards:
                     print(f"  - UID: {card['uid']} | {card['name']} | {card['department']}")
                 
@@ -505,19 +499,19 @@ def main():
                 if uid and name:
                     success = server.db.add_card(uid, name, dept)
                     if success:
-                        print(f"✅ Đã thêm thẻ {uid} - {name}")
+                        print(f" Đã thêm thẻ {uid} - {name}")
                     else:
-                        print(f"❌ Lỗi thêm thẻ (có thể đã tồn tại)")
+                        print(f" Lỗi thêm thẻ (có thể đã tồn tại)")
                 
             elif choice == "7":
-                print("👋 Tạm biệt!")
+                print(" Tạm biệt!")
                 break
                 
             else:
-                print("❌ Lựa chọn không hợp lệ!")
+                print(" Lựa chọn không hợp lệ!")
                 
         except KeyboardInterrupt:
-            print("\n🛑 Đã dừng chương trình")
+            print("\n Đã dừng chương trình")
             break
 
 if __name__ == "__main__":

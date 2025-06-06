@@ -1,19 +1,24 @@
 from flask import Flask, render_template, Response, request, abort, jsonify
 from flask_cors import CORS
-from camera.camera import VideoCamera
+import sys
+import os
+sys.path.append(os.path.dirname(__file__))
+from camera import VideoCamera
 import threading
 import time
 import cv2
 import json
-import os
 import base64
 from datetime import datetime
 
 # Import RFID MQTT components
 try:
-    from rfid.rfid_mqtt_server_v2 import RFIDMQTTServer  # Sử dụng version 2 với hỗ trợ vào/ra
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'rfid'))
+    from rfid_mqtt_server_v2 import RFIDMQTTServer  # Sử dụng version 2 với hỗ trợ vào/ra
 except ImportError:
-    from rfid.rfid_mqtt_server import RFIDMQTTServer  # Fallback to original version
+    from rfid_mqtt_server import RFIDMQTTServer  # Fallback to original version
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'Database'))
 from whitelist_db import WhitelistDB
 
 app = Flask(__name__)
@@ -108,16 +113,16 @@ def snapshot():
             }
             
             if plate_texts:
-                print(f"🚗 Đã trích xuất biển số: {plate_texts[0]}")
+                print(f"Đã trích xuất biển số: {plate_texts[0]}")
             else:
-                print("⚠️ Không trích xuất được biển số")
+                print("Không trích xuất được biển số")
                 result["success"] = False
                 result["error"] = "Không trích xuất được biển số từ ảnh"
             
             return jsonify(result)
             
         except Exception as e:
-            print(f"❌ Lỗi trích xuất biển số: {e}")
+            print(f"Lỗi trích xuất biển số: {e}")
             return jsonify({
                 "success": False,
                 "error": f"Lỗi xử lý ảnh: {str(e)}",
@@ -428,7 +433,7 @@ def save_plate_info():
                     }}
                 )
                 mongodb_result = update_result
-                print(f"✅ Đã cập nhật biển số trong vehicle_tracking: {license_plate} (UID: {uid})")
+                print(f"Đã cập nhật biển số trong vehicle_tracking: {license_plate} (UID: {uid})")
                 entry_result = {
                     "success": True,
                     "message": f"Đã cập nhật biển số cho xe trong bãi",
@@ -437,7 +442,7 @@ def save_plate_info():
             else:
                 # Thêm mới xe vào bãi
                 entry_result = db.vehicle_entry(uid, license_plate, None)
-                print(f"✅ Đã thêm xe vào bãi qua widget: {license_plate} (UID: {uid})")
+                print(f"Đã thêm xe vào bãi qua widget: {license_plate} (UID: {uid})")
                 mongodb_result = {"inserted_id": entry_result.get("entry_id", "unknown")}
         else:
             # Nếu không có UID, tạo bản ghi xe vào không có UID
@@ -457,7 +462,7 @@ def save_plate_info():
             
             insert_result = db.vehicle_tracking_collection.insert_one(entry_data)
             mongodb_result = insert_result
-            print(f"✅ Đã lưu biển số vào vehicle_tracking (manual): {license_plate}")
+            print(f"Đã lưu biển số vào vehicle_tracking (manual): {license_plate}")
             entry_result = {
                 "success": True,
                 "message": f"Đã lưu biển số (thủ công)",
@@ -477,7 +482,7 @@ def save_plate_info():
         with open(log_file, 'w', encoding='utf-8') as f:
             json.dump(logs, f, ensure_ascii=False, indent=2)
         
-        print(f"✅ Đã lưu thông tin biển số: {license_plate} (UID: {uid}) vào vehicle_tracking và JSON backup")
+        print(f"Đã lưu thông tin biển số: {license_plate} (UID: {uid}) vào vehicle_tracking và JSON backup")
         
         return jsonify({
             "success": True,
@@ -490,7 +495,7 @@ def save_plate_info():
         })
         
     except Exception as e:
-        print(f"❌ Lỗi lưu thông tin biển số: {e}")
+        print(f"Lỗi lưu thông tin biển số: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/vehicle/recent_plates")
@@ -531,10 +536,10 @@ def get_recent_plates():
                     "match_status": plate.get("match_status")
                 })
             
-            print(f"✅ Đã tải {len(recent_plates)} biển số từ vehicle_tracking collection")
+            print(f"Đã tải {len(recent_plates)} biển số từ vehicle_tracking collection")
             
         except Exception as mongo_error:
-            print(f"⚠️ Lỗi đọc từ MongoDB: {mongo_error}, fallback về JSON files")
+            print(f"Lỗi đọc từ MongoDB: {mongo_error}, fallback về JSON files")
             
             # Fallback về JSON files nếu MongoDB lỗi
             log_dir = "Data/plate_logs"
@@ -555,7 +560,7 @@ def get_recent_plates():
                 # Lấy 20 bản ghi gần nhất
                 recent_plates = recent_plates[:20]
                 
-                print(f"✅ Đã tải {len(recent_plates)} biển số từ JSON files")
+                print(f"Đã tải {len(recent_plates)} biển số từ JSON files")
         
         return jsonify({
             "success": True,
@@ -565,7 +570,7 @@ def get_recent_plates():
         })
         
     except Exception as e:
-        print(f"❌ Lỗi tổng quát: {e}")
+        print(f"Lỗi tổng quát: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/plate_edit")
@@ -655,7 +660,7 @@ def save_plate_edit():
         import re
         plate_pattern = r'^[0-9]{2}[A-Z]-[0-9]{3,5}$|^[0-9]{2}[A-Z][0-9]-[0-9]{3,5}$'
         if not re.match(plate_pattern, license_plate):
-            print(f"⚠️ Biển số {license_plate} không đúng định dạng chuẩn, nhưng vẫn cho phép lưu")
+            print(f"Biển số {license_plate} không đúng định dạng chuẩn, nhưng vẫn cho phép lưu")
         
         # Tạo thư mục lưu trữ
         log_dir = "Data/plate_logs"
@@ -693,13 +698,13 @@ def save_plate_edit():
                 # Kiểm tra UID có tồn tại không
                 card_info = db.check_uid_allowed(uid)
                 if card_info["allowed"]:
-                    print(f"✅ UID {uid} hợp lệ cho {card_info.get('name', 'Unknown')}")
+                    print(f"UID {uid} hợp lệ cho {card_info.get('name', 'Unknown')}")
                 else:
-                    print(f"⚠️ UID {uid} không có trong whitelist")
+                    print(f"UID {uid} không có trong whitelist")
             except Exception as e:
-                print(f"⚠️ Không thể kiểm tra UID: {e}")
+                print(f"Không thể kiểm tra UID: {e}")
         
-        print(f"✅ Đã lưu biển số: {license_plate}" + (f" (UID: {uid})" if uid else ""))
+        print(f"Đã lưu biển số: {license_plate}" + (f" (UID: {uid})" if uid else ""))
         
         return jsonify({
             "success": True,
@@ -711,7 +716,7 @@ def save_plate_edit():
         })
         
     except Exception as e:
-        print(f"❌ Lỗi lưu thông tin: {e}")
+        print(f"Lỗi lưu thông tin: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/vehicle/auto_save", methods=["POST"])
@@ -758,48 +763,27 @@ def start_rfid_server():
         with rfid_lock:
             if rfid_server is None:
                 rfid_server = RFIDMQTTServer()
-                print("🚀 Đang khởi động RFID MQTT Server...")
+                print("Đang khởi động RFID MQTT Server...")
                 
                 # Khởi động RFID server trong thread riêng để không block Flask
                 def run_rfid_server():
                     try:
                         rfid_server.start()
                     except Exception as e:
-                        print(f"❌ Lỗi RFID Server thread: {e}")
+                        print(f"Lỗi RFID Server thread: {e}")
                 
                 rfid_thread = threading.Thread(target=run_rfid_server, daemon=True)
                 rfid_thread.start()
                 
                 # Chờ một chút để RFID server khởi động
                 time.sleep(2)
-                print("✅ RFID Server thread đã khởi động")
+                print("RFID Server thread đã khởi động")
                 
     except Exception as e:
-        print(f"❌ Lỗi khởi động RFID Server: {e}")
+        print(f"Lỗi khởi động RFID Server: {e}")
 
 if __name__ == "__main__":
-    print("🚀 Starting License Plate Detection Server...")
-    print("📸 Snapshot feature: Camera will continue running after snapshots")
-    print(f"🌐 HTTP Access at: http://127.0.0.1:5000")
-    print("📱 API Endpoints:")
-    print("   - GET / : Web interface")
-    print("   - GET /video_feed : Live video stream")
-    print("   - GET /snapshot?flag=1&crop=1&extract_plate=1 : Capture & extract plate")
-    print("   - GET /status : System status")
-    print("   - GET /rfid/status : RFID server status")
-    print("   - GET /rfid/whitelist : Get whitelist")
-    print("   - POST /rfid/add_card : Add card to whitelist")
-    print("   - POST /rfid/remove_card : Remove card from whitelist")
-    print("   - POST /rfid/test_uid : Test UID access")
-    print("   - GET /vehicle/parking_status : Parking lot status")
-    print("   - GET /vehicle/history/<uid> : Vehicle history")
-    print("   - POST /vehicle/force_exit : Force vehicle exit")
-    print("   - POST /vehicle/save_plate_info : Save edited plate info")
-    print("   - GET /vehicle/recent_plates : Get recent plates")
-    print("   - GET /plate_edit : Edit plate page")
-    print("   - POST /save_plate_edit : Save edited plate info from form")
-    print("   - POST /vehicle/auto_save : Toggle auto-save feature")
-    print("   - GET /vehicle/auto_save_status : Get auto-save status")
+    print("Starting License Plate Detection Server...")
     
     # Start RFID server
     start_rfid_server()

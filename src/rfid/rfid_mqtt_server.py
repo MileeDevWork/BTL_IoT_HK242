@@ -4,9 +4,16 @@ import logging
 import threading
 import time
 import requests
+import sys
+import os
 from datetime import datetime
+
+# Add paths for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'Database'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'mqtt'))
+
 from whitelist_db import WhitelistDB
-from mqtt.mqtt_config import *
+from mqtt_config import *
 
 # Setup logging
 logging.basicConfig(
@@ -21,30 +28,29 @@ class RFIDMQTTServer:
         self.client = mqtt.Client()
         self.db = WhitelistDB()
         self.is_running = False
-        
-        # Setup MQTT callbacks
+          # Setup MQTT callbacks
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
         self.client.on_disconnect = self.on_disconnect
         
-        logger.info("🚀 RFID MQTT Server đã được khởi tạo")
+        logger.info("RFID MQTT Server đã được khởi tạo")
     
     def on_connect(self, client, userdata, flags, rc):
         """Callback khi kết nối MQTT thành công"""
         if rc == 0:
-            logger.info(f"✅ Đã kết nối MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
+            logger.info(f" Đã kết nối MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
             
             # Subscribe topic nhận UID từ thiết bị RFID
             client.subscribe(TOPIC_SUB)
-            logger.info(f"📡 Đã subscribe topic: {TOPIC_SUB}")
+            logger.info(f" Đã subscribe topic: {TOPIC_SUB}")
             
             self.is_running = True
         else:
-            logger.error(f"❌ Lỗi kết nối MQTT Broker. Code: {rc}")
+            logger.error(f" Lỗi kết nối MQTT Broker. Code: {rc}")
     
     def on_disconnect(self, client, userdata, rc):
         """Callback khi mất kết nối MQTT"""
-        logger.warning(f"⚠️ Mất kết nối MQTT Broker. Code: {rc}")
+        logger.warning(f" Mất kết nối MQTT Broker. Code: {rc}")
         self.is_running = False
     
     def on_message(self, client, userdata, msg):
@@ -61,7 +67,7 @@ class RFIDMQTTServer:
         try:
             # Decode message
             message = msg.payload.decode('utf-8')
-            logger.info(f"📨 Nhận message từ {msg.topic}: {message}")
+            logger.info(f" Nhận message từ {msg.topic}: {message}")
             
             # Parse JSON
             try:
@@ -74,7 +80,7 @@ class RFIDMQTTServer:
             device_id = data.get("device_id", "UNKNOWN_DEVICE")
             
             if not uid:
-                logger.warning("⚠️ Message không chứa UID hợp lệ")
+                logger.warning(" Message không chứa UID hợp lệ")
                 return
             
             # Kiểm tra UID trong whitelist
@@ -110,7 +116,7 @@ class RFIDMQTTServer:
                 self.trigger_camera_snapshot(uid, auth_result["name"])
             
         except Exception as e:
-            logger.error(f"❌ Lỗi xử lý message: {e}")
+            logger.error(f" Lỗi xử lý message: {e}")
             
             # Gửi error response
             error_response = {
@@ -130,42 +136,42 @@ class RFIDMQTTServer:
             result = self.client.publish(TOPIC_PUB, response_json)
             
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
-                status = "✅ Cho phép" if response_data["allowed"] else "❌ Từ chối"
-                logger.info(f"📤 Đã gửi response: {status} - UID: {response_data['uid']}")
+                status = " Cho phép" if response_data["allowed"] else " Từ chối"
+                logger.info(f" Đã gửi response: {status} - UID: {response_data['uid']}")
             else:
-                logger.error(f"❌ Lỗi gửi response. Code: {result.rc}")
+                logger.error(f" Lỗi gửi response. Code: {result.rc}")
                 
         except Exception as e:
-            logger.error(f"❌ Lỗi gửi response: {e}")
+            logger.error(f" Lỗi gửi response: {e}")
     
     def trigger_camera_snapshot(self, uid, name):
         """Kích hoạt chụp ảnh từ camera khi truy cập thành công"""
         try:
             snapshot_url = f"http://{FLASK_HOST}:{FLASK_PORT}/snapshot?flag=1&crop=1"
             
-            logger.info(f"📸 Đang chụp ảnh cho UID: {uid} - {name}")
+            logger.info(f" Đang chụp ảnh cho UID: {uid} - {name}")
             
             # Gửi request chụp ảnh (non-blocking)
             def capture_async():
                 try:
                     response = requests.get(snapshot_url, timeout=10)
                     if response.status_code == 200:
-                        logger.info(f"✅ Đã chụp ảnh thành công cho {name}")
+                        logger.info(f" Đã chụp ảnh thành công cho {name}")
                     else:
-                        logger.warning(f"⚠️ Lỗi chụp ảnh: HTTP {response.status_code}")
+                        logger.warning(f" Lỗi chụp ảnh: HTTP {response.status_code}")
                 except requests.exceptions.RequestException as e:
-                    logger.warning(f"⚠️ Không thể kết nối camera: {e}")
+                    logger.warning(f" Không thể kết nối camera: {e}")
             
             # Chạy trong thread riêng để không block MQTT
             threading.Thread(target=capture_async, daemon=True).start()
             
         except Exception as e:
-            logger.error(f"❌ Lỗi trigger camera: {e}")
+            logger.error(f" Lỗi trigger camera: {e}")
     
     def start(self):
         """Khởi động MQTT Server"""
         try:
-            logger.info(f"🔄 Đang kết nối tới MQTT Broker...")
+            logger.info(f" Đang kết nối tới MQTT Broker...")
             
             # Kết nối MQTT Broker
             self.client.connect(MQTT_BROKER, MQTT_PORT, 60)
@@ -173,41 +179,41 @@ class RFIDMQTTServer:
             # Bắt đầu loop
             self.client.loop_start()
             
-            logger.info("🚀 RFID MQTT Server đã khởi động!")
-            logger.info(f"📡 Subscribe topic: {TOPIC_SUB}")
-            logger.info(f"📤 Publish topic: {TOPIC_PUB}")
-            logger.info(f"📸 Camera URL: http://{FLASK_HOST}:{FLASK_PORT}")
+            logger.info(" RFID MQTT Server đã khởi động!")
+            logger.info(f" Subscribe topic: {TOPIC_SUB}")
+            logger.info(f" Publish topic: {TOPIC_PUB}")
+            logger.info(f" Camera URL: http://{FLASK_HOST}:{FLASK_PORT}")
             
             # Keep running
             while True:
                 if not self.is_running:
-                    logger.warning("⚠️ MQTT connection lost. Attempting to reconnect...")
+                    logger.warning(" MQTT connection lost. Attempting to reconnect...")
                     time.sleep(5)
                     try:
                         self.client.reconnect()
                     except Exception as e:
-                        logger.error(f"❌ Reconnect failed: {e}")
+                        logger.error(f" Reconnect failed: {e}")
                 
                 time.sleep(1)
                 
         except KeyboardInterrupt:
-            logger.info("🛑 Đang dừng server...")
+            logger.info(" Đang dừng server...")
             self.stop()
         except Exception as e:
-            logger.error(f"❌ Lỗi khởi động server: {e}")
+            logger.error(f" Lỗi khởi động server: {e}")
     
     def stop(self):
         """Dừng MQTT Server"""
         try:
             self.client.loop_stop()
             self.client.disconnect()
-            logger.info("✅ RFID MQTT Server đã dừng")
+            logger.info(" RFID MQTT Server đã dừng")
         except Exception as e:
-            logger.error(f"❌ Lỗi dừng server: {e}")
+            logger.error(f" Lỗi dừng server: {e}")
     
     def test_uid(self, uid):
         """Test function để kiểm tra UID"""
-        logger.info(f"🧪 Testing UID: {uid}")
+        logger.info(f" Testing UID: {uid}")
         
         # Tạo test message
         test_message = {
@@ -229,7 +235,7 @@ class RFIDMQTTServer:
 def main():
     server = RFIDMQTTServer()
     
-    print("\n🎯 RFID MQTT Access Control System")
+    print("\n RFID MQTT Access Control System")
     print("="*50)
     print("1. Khởi động server")
     print("2. Test UID")
@@ -239,10 +245,10 @@ def main():
     
     while True:
         try:
-            choice = input("\n👉 Chọn chức năng (1-5): ").strip()
+            choice = input("\n Chọn chức năng (1-5): ").strip()
             
             if choice == "1":
-                print("\n🚀 Đang khởi động RFID MQTT Server...")
+                print("\n Đang khởi động RFID MQTT Server...")
                 server.start()
                 break
                 
@@ -253,7 +259,7 @@ def main():
                 
             elif choice == "3":
                 cards = server.db.get_all_cards()
-                print(f"\n📋 Danh sách thẻ ({len(cards)} thẻ):")
+                print(f"\n Danh sách thẻ ({len(cards)} thẻ):")
                 for card in cards:
                     print(f"  - UID: {card['uid']} | {card['name']} | {card['department']}")
                 
@@ -265,19 +271,19 @@ def main():
                 if uid and name:
                     success = server.db.add_card(uid, name, dept)
                     if success:
-                        print(f"✅ Đã thêm thẻ {uid} - {name}")
+                        print(f" Đã thêm thẻ {uid} - {name}")
                     else:
-                        print(f"❌ Lỗi thêm thẻ (có thể đã tồn tại)")
+                        print(f" Lỗi thêm thẻ (có thể đã tồn tại)")
                 
             elif choice == "5":
-                print("👋 Tạm biệt!")
+                print(" Tạm biệt!")
                 break
                 
             else:
-                print("❌ Lựa chọn không hợp lệ!")
+                print(" Lựa chọn không hợp lệ!")
                 
         except KeyboardInterrupt:
-            print("\n🛑 Đã dừng chương trình")
+            print("\n Đã dừng chương trình")
             break
 
 if __name__ == "__main__":

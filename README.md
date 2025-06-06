@@ -199,7 +199,7 @@ python startup.py
 ### mqtt_config.py
 ```python
 # MQTT Configuration
-MQTT_BROKER = "test.mosquitto.org"
+MQTT_BROKER = "app.coreiot.io"
 MQTT_PORT = 1883
 TOPIC_SUB = "yolouno/rfid/scan"
 TOPIC_PUB = "yolouno/rfid/response"

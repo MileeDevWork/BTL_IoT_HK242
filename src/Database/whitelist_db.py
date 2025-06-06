@@ -1,7 +1,12 @@
 import pymongo
 from datetime import datetime
 import logging
-from mqtt.mqtt_config import MONGODB_URI, DATABASE_NAME, COLLECTION_NAME
+import sys
+import os
+
+# Add path for mqtt config
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'mqtt'))
+from mqtt_config import MONGODB_URI, DATABASE_NAME, COLLECTION_NAME
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -18,13 +23,13 @@ class WhitelistDB:
             self.license_plates_collection = self.db["license_plates"]
             # Thêm collection cho theo dõi xe vào/ra
             self.vehicle_tracking_collection = self.db["vehicle_tracking"]
-            logger.info("✅ Đã kết nối MongoDB thành công")
+            logger.info("Đã kết nối MongoDB thành công")
             
             # Tạo sample data nếu collection trống
             self._init_sample_data()
             
         except Exception as e:
-            logger.error(f"❌ Lỗi kết nối MongoDB: {e}")
+            logger.error(f"Lỗi kết nối MongoDB: {e}")
             raise
     
     def _init_sample_data(self):
@@ -58,7 +63,7 @@ class WhitelistDB:
             ]
             
             self.collection.insert_many(sample_cards)
-            logger.info(f"✅ Đã thêm {len(sample_cards)} thẻ mẫu vào whitelist")
+            logger.info(f"Đã thêm {len(sample_cards)} thẻ mẫu vào whitelist")
     
     def check_uid_allowed(self, uid):
         """
@@ -77,7 +82,7 @@ class WhitelistDB:
             })
             
             if card:
-                logger.info(f"✅ UID {uid} được phép truy cập - {card['name']}")
+                logger.info(f"UID {uid} được phép truy cập - {card['name']}")
                 return {
                     "allowed": True,
                     "uid": uid,
@@ -86,7 +91,7 @@ class WhitelistDB:
                     "message": "Truy cập được phép"
                 }
             else:
-                logger.warning(f"❌ UID {uid} không được phép truy cập")
+                logger.warning(f"UID {uid} không được phép truy cập")
                 return {
                     "allowed": False,
                     "uid": uid,
@@ -96,7 +101,7 @@ class WhitelistDB:
                 }
                 
         except Exception as e:
-            logger.error(f"❌ Lỗi kiểm tra UID {uid}: {e}")
+            logger.error(f"Lỗi kiểm tra UID {uid}: {e}")
             return {
                 "allowed": False,
                 "uid": uid,
@@ -120,15 +125,15 @@ class WhitelistDB:
             # Kiểm tra UID đã tồn tại chưa
             existing = self.collection.find_one({"uid": uid})
             if existing:
-                logger.warning(f"⚠️ UID {uid} đã tồn tại")
+                logger.warning(f"UID {uid} đã tồn tại")
                 return False
             
             self.collection.insert_one(card_data)
-            logger.info(f"✅ Đã thêm thẻ {uid} - {name}")
+            logger.info(f"Đã thêm thẻ {uid} - {name}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Lỗi thêm thẻ {uid}: {e}")
+            logger.error(f"Lỗi thêm thẻ {uid}: {e}")
             return False
     
     def remove_card(self, uid):
@@ -145,14 +150,14 @@ class WhitelistDB:
             )
             
             if result.modified_count > 0:
-                logger.info(f"✅ Đã vô hiệu hóa thẻ {uid}")
+                logger.info(f"Đã vô hiệu hóa thẻ {uid}")
                 return True
             else:
-                logger.warning(f"⚠️ Không tìm thấy thẻ {uid}")
+                logger.warning(f"Không tìm thấy thẻ {uid}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Lỗi xóa thẻ {uid}: {e}")
+            logger.error(f"Lỗi xóa thẻ {uid}: {e}")
             return False
     
     def get_all_cards(self):
@@ -161,7 +166,7 @@ class WhitelistDB:
             cards = list(self.collection.find({"status": "active"}))
             return cards
         except Exception as e:
-            logger.error(f"❌ Lỗi lấy danh sách thẻ: {e}")
+            logger.error(f"Lỗi lấy danh sách thẻ: {e}")
             return []
     
     def log_access_attempt(self, uid, allowed, additional_info=None):
@@ -176,10 +181,10 @@ class WhitelistDB:
             }
             
             log_collection.insert_one(log_data)
-            logger.info(f"📝 Đã ghi log truy cập: {uid} - {'Cho phép' if allowed else 'Từ chối'}")
+            logger.info(f"Đã ghi log truy cập: {uid} - {'Cho phép' if allowed else 'Từ chối'}")
             
         except Exception as e:
-            logger.error(f"❌ Lỗi ghi log: {e}")
+            logger.error(f"Lỗi ghi log: {e}")
     
     def save_license_plate(self, plate_text, image_path=None):
         """
@@ -194,7 +199,7 @@ class WhitelistDB:
         """
         try:
             if not plate_text or not plate_text.strip():
-                logger.warning("⚠️ Plate text trống, không lưu vào database")
+                logger.warning("Plate text trống, không lưu vào database")
                 return None
                 
             plate_data = {
@@ -207,11 +212,11 @@ class WhitelistDB:
             result = self.license_plates_collection.insert_one(plate_data)
             plate_id = str(result.inserted_id)
             
-            logger.info(f"💾 Đã lưu biển số: {plate_text} với ID: {plate_id}")
+            logger.info(f"Đã lưu biển số: {plate_text} với ID: {plate_id}")
             return plate_id
             
         except Exception as e:
-            logger.error(f"❌ Lỗi lưu biển số {plate_text}: {e}")
+            logger.error(f"Lỗi lưu biển số {plate_text}: {e}")
             return None
     
     def get_license_plates(self, limit=50):
@@ -230,7 +235,7 @@ class WhitelistDB:
                          .limit(limit))
             return plates
         except Exception as e:
-            logger.error(f"❌ Lỗi lấy danh sách biển số: {e}")
+            logger.error(f"Lỗi lấy danh sách biển số: {e}")
             return []
     
     def search_license_plate(self, plate_text):
@@ -249,7 +254,7 @@ class WhitelistDB:
             }).sort("time_in", -1))
             return plates
         except Exception as e:
-            logger.error(f"❌ Lỗi tìm kiếm biển số {plate_text}: {e}")
+            logger.error(f"Lỗi tìm kiếm biển số {plate_text}: {e}")
             return []
 
     # =============================================================================
@@ -277,7 +282,7 @@ class WhitelistDB:
             })
             
             if existing_entry:
-                logger.warning(f"⚠️ Xe với UID {uid} đã có trong bãi")
+                logger.warning(f"Xe với UID {uid} đã có trong bãi")
                 return {
                     "success": False,
                     "message": f"Xe đã có trong bãi từ {existing_entry['entry_time']}",
@@ -301,7 +306,7 @@ class WhitelistDB:
             result = self.vehicle_tracking_collection.insert_one(entry_data)
             entry_id = str(result.inserted_id)
             
-            logger.info(f"🚗➡️ Xe vào: UID {uid}, Biển số {license_plate}")
+            logger.info(f"Xe vào: UID {uid}, Biển số {license_plate}")
             
             return {
                 "success": True,
@@ -311,7 +316,7 @@ class WhitelistDB:
             }
             
         except Exception as e:
-            logger.error(f"❌ Lỗi ghi nhận xe vào {uid}: {e}")
+            logger.error(f"Lỗi ghi nhận xe vào {uid}: {e}")
             return {
                 "success": False,
                 "message": f"Lỗi hệ thống: {str(e)}"
@@ -338,7 +343,7 @@ class WhitelistDB:
             })
             
             if not entry_record:
-                logger.warning(f"⚠️ Không tìm thấy xe với UID {uid} trong bãi")
+                logger.warning(f"Không tìm thấy xe với UID {uid} trong bãi")
                 return {
                     "success": False,
                     "message": f"Xe với UID {uid} không có trong bãi",
@@ -367,11 +372,11 @@ class WhitelistDB:
             
             result_message = f"Xe ra thành công - UID: {uid}"
             if plates_match:
-                result_message += f"\n✅ Biển số khớp: {entry_plate}"
-                logger.info(f"🚗⬅️✅ Xe ra khớp biển số: UID {uid}, {entry_plate} = {license_plate}")
+                result_message += f"\nBiển số khớp: {entry_plate}"
+                logger.info(f"Xe ra khớp biển số: UID {uid}, {entry_plate} = {license_plate}")
             else:
-                result_message += f"\n❌ Biển số KHÔNG khớp!\nVào: {entry_plate}\nRa: {license_plate}"
-                logger.warning(f"🚗⬅️❌ Xe ra KHÔNG khớp biển số: UID {uid}, {entry_plate} ≠ {license_plate}")
+                result_message += f"\nBiển số KHÔNG khớp!\nVào: {entry_plate}\nRa: {license_plate}"
+                logger.warning(f"Xe ra KHÔNG khớp biển số: UID {uid}, {entry_plate} ≠ {license_plate}")
             
             return {
                 "success": True,
@@ -384,7 +389,7 @@ class WhitelistDB:
             }
             
         except Exception as e:
-            logger.error(f"❌ Lỗi ghi nhận xe ra {uid}: {e}")
+            logger.error(f"Lỗi ghi nhận xe ra {uid}: {e}")
             return {
                 "success": False,
                 "message": f"Lỗi hệ thống: {str(e)}"
@@ -435,7 +440,7 @@ class WhitelistDB:
             
             return vehicles
         except Exception as e:
-            logger.error(f"❌ Lỗi lấy danh sách xe trong bãi: {e}")
+            logger.error(f"Lỗi lấy danh sách xe trong bãi: {e}")
             return []
     
     def get_vehicle_history(self, uid=None, limit=50):
@@ -460,7 +465,7 @@ class WhitelistDB:
             
             return history
         except Exception as e:
-            logger.error(f"❌ Lỗi lấy lịch sử xe: {e}")
+            logger.error(f"Lỗi lấy lịch sử xe: {e}")
             return []
     
     def get_mismatch_reports(self, limit=20):
@@ -480,12 +485,12 @@ class WhitelistDB:
             
             return mismatches
         except Exception as e:
-            logger.error(f"❌ Lỗi lấy báo cáo không khớp: {e}")
+            logger.error(f"Lỗi lấy báo cáo không khớp: {e}")
             return []
 
 # Test functions
 if __name__ == "__main__":
-    print("🧪 Testing WhitelistDB...")
+    print("Testing WhitelistDB...")
     
     try:
         db = WhitelistDB()
@@ -503,7 +508,7 @@ if __name__ == "__main__":
         print(f"Tổng số thẻ active: {len(cards)}")
         
         # Test vehicle entry
-        print("\n🚗 Testing vehicle tracking...")
+        print("\nTesting vehicle tracking...")
         entry_result = db.vehicle_entry("A1B2C3D4", "30A-12345", "/path/to/entry_image.jpg")
         print(f"Vehicle entry: {entry_result}")
         
@@ -519,7 +524,7 @@ if __name__ == "__main__":
         exit_result2 = db.vehicle_exit("A1B2C3D4", "30A-99999", "/path/to/exit_image2.jpg")
         print(f"Vehicle exit (mismatch): {exit_result2}")
         
-        print("✅ Test hoàn thành!")
+        print("Test hoàn thành!")
         
     except Exception as e:
-        print(f"❌ Lỗi test: {e}")
+        print(f"Lỗi test: {e}")
